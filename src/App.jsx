@@ -30,8 +30,8 @@ function DoctorCard({ doctor, onBook, onProfile }) {
 
 function App() {
   const [page, setPage] = useState(() => location.hash.slice(1) || 'discover');
-  const [theme, setTheme] = useState(() => localStorage.getItem('carewell-theme') || 'system');
-  const [resolvedTheme, setResolvedTheme] = useState(() => document.documentElement.dataset.theme || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('carewell-theme') || 'dark');
+  const [resolvedTheme, setResolvedTheme] = useState(() => document.documentElement.dataset.theme || 'dark');
   const activeTheme = theme === 'system' ? resolvedTheme : theme;
   const [doctors, setDoctors] = useState([]);
   const [facilities, setFacilities] = useState([]);
