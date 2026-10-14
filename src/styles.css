@@ -628,17 +628,17 @@ td { padding: 11px 13px; color: var(--color-text-secondary); border-top: 1px sol
   .mobile-drawer { padding: 20px; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
-:root[data-theme="dark"] .glass-card-light { background: rgba(13,43,76,.58); border-color: rgba(190,218,245,.18); box-shadow: 0 20px 40px -26px rgba(0,0,0,.7),inset 0 1px 0 rgba(206,231,255,.1); }
+:root[data-theme="dark"] .glass-card-light { background: rgba(13, 47, 82, 0.58); border-color: rgba(190,218,245,.18); box-shadow: 0 20px 40px -26px rgba(0,0,0,.7),inset 0 1px 0 rgba(206,231,255,.1); }
 :root[data-theme="dark"] .glass-card { border-color: rgba(190,218,245,.18); background: rgba(13,43,76,.58); box-shadow: 0 20px 40px -26px rgba(0,0,0,.7),inset 0 1px 0 rgba(206,231,255,.1); }
 :root[data-theme="dark"] .glass-card::before { background: linear-gradient(135deg,rgba(84,140,198,.16),rgba(10,32,59,.05)); }
 :root[data-theme="dark"] .glass-pill { background: rgba(31,73,120,.4); border-color: rgba(190,218,245,.16); }
 :root[data-theme="dark"] .drawer-link { color: var(--color-text-primary); }
-:root[data-theme="dark"] .drawer-link:hover { background: rgba(96,165,250,.16); color: #fff; }
+:root[data-theme="dark"] .drawer-link:hover { background: rgba(93, 163, 249, 0.16); color: #fff; }
 :root[data-theme="dark"] .drawer-link-active,
 :root[data-theme="dark"] .drawer-link-active:hover { color: #fff; border-color: rgba(97, 165, 248, 0.42); background: rgba(37,99,235,.42); }
 :root[data-theme="dark"] .drawer-link-active .drawer-arrow { color: #fff; }
 @media (max-width: 1150px) and (min-width: 901px) { .topbar { width: calc(100% - 40px); padding: 12px 10px 16px 14px; gap: 9px; } .nav-identity { gap: 8px; } .topbar-nav-link { gap: 5px; padding: 0 8px; font-size: 9px; } .command-pill { gap: 1px; } .nav-account { padding-right: 7px; } }
-@media (max-width: 900px) { .topbar { width: auto; min-height: 58px; margin: 10px 24px 12px; padding: 7px 12px; gap: 9px; } .nav-identity { flex: 1; gap: 8px; margin-right: auto; } .brand-crumb { display: none; } .topbar-brand { font-size: 15px; } .topbar-nav { display: none; } .command-pill { gap: 2px; padding: 4px; } .command-pill .nav-divider { display: none; } .nav-account { padding-right: 4px; } .nav-account > span { display: none; } }
+@media (max-width: 901px) { .topbar { width: auto; min-height: 58px; margin: 10px 24px 12px; padding: 7px 12px; gap: 9px; } .nav-identity { flex: 1; gap: 8px; margin-right: auto; } .brand-crumb { display: none; } .topbar-brand { font-size: 15px; } .topbar-nav { display: none; } .command-pill { gap: 2px; padding: 4px; } .command-pill .nav-divider { display: none; } .nav-account { padding-right: 4px; } .nav-account > span { display: none; } }
 @media (max-width: 650px) { .topbar { margin: 10px 12px 12px; padding: 6px 8px; } .topbar-brand { gap: 6px; padding: 5px 8px; font-size: 13px; } .topbar-brand-home { gap: 6px; } .topbar-brand small { font-size: 6px; } .topbar-brand .brand-mark { width: 27px; height: 27px; } .brand-crumb { gap: 3px; padding-left: 6px; font-size: 8px; } .brand-crumb strong { max-width: 104px; } .command-pill .icon-button { width: 30px; height: 30px; } .nav-account .topbar-avatar { width: 25px; height: 25px; } }
 .sidebar { display: none !important; }
 .main-column { margin-left: 0; }
@@ -648,17 +648,17 @@ td { padding: 11px 13px; color: var(--color-text-secondary); border-top: 1px sol
 .mobile-drawer-backdrop { justify-content: flex-start; align-items: stretch; padding: 12px; background: rgba(6,42,101,.2); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .mobile-drawer { width: min(380px,calc(100vw - 24px)); height: calc(100dvh - 24px); max-height: none; border-radius: 28px; animation: drawer-side-in .28s cubic-bezier(.2,.8,.2,1) both; }
 @keyframes drawer-side-in { from { opacity: .55; transform: translateX(-18px); } to { opacity: 1; transform: translateX(0); } }
-@media (max-width: 900px) { .topbar .mobile-menu { width: 33px; height: 33px; } .mobile-drawer-backdrop { justify-content: center; padding: 12px; } .mobile-drawer { width: min(100%,420px); height: 100%; border-radius: 30px; animation: drawer-in .25s cubic-bezier(.2,.8,.2,1) both; backdrop-filter: blur(32px) saturate(130%); -webkit-backdrop-filter: blur(32px) saturate(130%); } }
+@media (max-width: 901px) { .topbar .mobile-menu { width: 33px; height: 33px; } .mobile-drawer-backdrop { justify-content: center; padding: 12px; } .mobile-drawer { width: min(100%,420px); height: 100%; border-radius: 30px; animation: drawer-in .25s cubic-bezier(.2,.8,.2,1) both; backdrop-filter: blur(32px) saturate(130%); -webkit-backdrop-filter: blur(32px) saturate(130%); } }
 @media (max-width: 390px) { .brand-crumb strong { max-width: 72px; } .topbar-brand small { display: none; } .topbar-brand { gap: 7px; } .topbar-brand-home { gap: 6px; } }
 .desktop-menu-button { display: grid; flex: none; place-items: center; width: 34px; height: 34px; padding: 0; color: var(--color-text-secondary); border-radius: 50%; }
 @keyframes drawer-side-in-right { from { opacity: .55; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
 @media (min-width: 901px) {
-  .desktop-menu-button { display: grid; flex: none; place-items: center; width: 34px; height: 34px; padding: 0; color: var(--color-text-secondary); border-radius: 50%; }
+  .desktop-menu-button { display: grid; flex: none; place-items: center; width: 34px; height: 34px; padding: 0; color：var(--color-text-secondary); border-radius: 50%; }
   .desktop-menu-button:hover { color: var(--color-brand-primary); transform: translateY(-1px); }
   .mobile-drawer-backdrop { justify-content: flex-end; }
   .mobile-drawer { animation-name: drawer-side-in-right; backdrop-filter: blur(32px) saturate(130%); -webkit-backdrop-filter: blur(32px) saturate(130%); }
 }
-@media (max-width: 900px) { .desktop-menu-button { width: 30px; height: 30px; } }
+@media (max-width: 901px) { .desktop-menu-button { width: 31px; height: 31px; } }
 
 /* Payno-style background blur for the navbar command pill and mobile drawer only. */
 .command-pill {
@@ -678,5 +678,5 @@ td { padding: 11px 13px; color: var(--color-text-secondary); border-top: 1px sol
   box-shadow: none;
 }
 :root[data-theme="dark"] .mobile-drawer {
-  background: rgba(13,43,76,.58);
+  background: rgba(13, 43, 76, 0.58);
 }
