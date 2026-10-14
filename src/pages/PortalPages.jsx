@@ -1,20 +1,13 @@
 import { useEffect, useState } from "react";
 import {
   ArrowRight,
-  Check,
   LogOut,
   Plus,
   Save,
   ShieldCheck,
 } from "lucide-react";
-import { careService, serviceMode } from "./data/careService.js";
-
-const localDateKey = (date = new Date()) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+import { careService, serviceMode } from "../data/careService.js";
+import { localDateKey } from "../utils/date.js";
 
 function Heading({ title, text }) {
   return (
