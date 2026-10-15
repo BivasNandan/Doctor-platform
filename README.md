@@ -5,9 +5,9 @@ Find trusted doctors, request appointments, and coordinate care. A PERN-stack pl
 
 | Part | Status |
 | --- | --- |
-| [`client/`](client) – React web app (patients, doctors, administrators) | ✅ Built. Runs on an in-memory demo, ready to switch to the API. |
-| [`server/`](server) – Express + PostgreSQL API | ⏳ Not started. See [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md). |
-| [`docs/`](docs) – API contract, data model, architecture | ✅ Written for the backend team. |
+| [`client/`](client) – React web app (patients, doctors, administrators) |  Built. Runs on an in-memory demo, ready to switch to the API. |
+| [`server/`](server) – Express + PostgreSQL API |  Not started. See [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md). |
+| [`docs/`](docs) – API contract, data model, architecture |  Written for the backend team. |
 
 ## Quick start (client, demo mode)
 
