@@ -1,0 +1,101 @@
+/* Patient appointment list and tabs. */
+.appointment-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 0 15px;
+  padding-bottom: 3px;
+}
+.appointment-tabs button {
+  flex: none;
+  padding: 8px 12px;
+  color: var(--color-text-tertiary);
+  border: 1px solid transparent;
+  border-radius: 20px;
+  background: transparent;
+  font-size: 13px;
+}
+.appointment-tabs button.active {
+  color: var(--color-interactive-primary);
+  border-color: var(--color-info-border);
+  background: var(--color-selected-bg);
+  font-weight: 700;
+}
+.appointment-list {
+  display: grid;
+  gap: 10px;
+}
+.appointment-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 13px;
+  border-radius: 10px;
+}
+.appointment-date {
+  display: grid;
+  justify-items: center;
+  width: 48px;
+  flex: none;
+  padding: 7px 3px;
+  color: var(--color-brand-primary);
+  border: 1px solid var(--color-info-border);
+  border-radius: 8px;
+  background: var(--color-selected-bg);
+  line-height: 1.2;
+}
+.appointment-date strong {
+  font: 700 20px var(--font-display);
+}
+.appointment-date span {
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.appointment-doctor-image {
+  width: 43px;
+  height: 43px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.appointment-detail {
+  flex: 1;
+  min-width: 0;
+}
+.appointment-detail h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+}
+.appointment-detail p {
+  margin: 0 0 5px;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+.appointment-detail > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.appointment-detail > span i {
+  width: 3px;
+  height: 3px;
+  margin: 0 3px;
+  background: var(--color-text-muted);
+  border-radius: 50%;
+}
+.appointment-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.appointment-actions .button {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+.appointment-actions .text-link {
+  color: var(--color-error);
+  font-size: 12px;
+}

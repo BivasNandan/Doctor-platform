@@ -1,31 +1,58 @@
-# Carewell 
+# Carewell
 
-A healthcare discovery and care coordination prototype. The frontend supports an explicitly selected in-memory demo mode and a replaceable API adapter. No API server, persistence, authentication, messaging transport, or file storage is included. See [frontend integration notes](FRONTEND_INTEGRATION.md) for environment setup, proposed (not existing) API contracts, and limitations.
+Find trusted doctors, request appointments, and coordinate care. A PERN-stack platform
+(**P**ostgreSQL · **E**xpress · **R**eact · **N**ode).
 
-## Run locally
+| Part | Status |
+| --- | --- |
+| [`client/`](client) – React web app (patients, doctors, administrators) | ✅ Built. Runs on an in-memory demo, ready to switch to the API. |
+| [`server/`](server) – Express + PostgreSQL API | ⏳ Not started. See [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md). |
+| [`docs/`](docs) – API contract, data model, architecture | ✅ Written for the backend team. |
+
+## Quick start (client, demo mode)
 
 Requires Node.js 20.19+ or 22.12+.
 
 ```sh
+cd client
 npm install
-npm run dev
+npm run dev          # http://localhost:5173/Doctor-platform/
 ```
 
-Create a production bundle with `npm run build`.
+Demo mode uses fictional data that resets on reload. Any email and password signs in: choose **Doctor sign in** or
+**Administrator sign in** from the sidebar.
 
-## Frontend structure
+## Scripts (run in `client/`)
 
-- `src/App.jsx` contains the application shell, reusable interface pieces, hash-based views, and simulated user/admin interactions.
-- `src/data/contracts.js` documents the information shapes consumed by the UI.
-- `src/data/mockData.js` contains the demo fixtures.
-- `src/data/careService.js` selects the demo or API adapter behind one async service boundary. API errors do not fall back to demo data.
-- `src/PortalPages.jsx` contains doctor registration/sign-in and the doctor workspace preview.
-- `.env.example` documents the non-secret API configuration.
-- `PRD_TRACEABILITY.md` maps every functional requirement to current status and verification evidence.
-- `src/styles.css` defines semantic light/dark tokens and responsive shared components.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server with hot reload (proxies `/api` to the backend) |
+| `npm run build` / `npm run preview` | Production build / serve it locally |
+| `npm test` | Unit and integration tests (Vitest + Testing Library) |
+| `npm run lint` / `npm run lint:fix` | ESLint |
+| `npm run format` / `npm run format:check` | Prettier |
+| `npm run check` | Lint + format check + tests + build (what CI runs) |
 
-## Included views
+## Connecting a backend
 
-Discovery, doctor directory and profile, clinics, simulated appointment requests, patient appointments, messages, doctor registration/sign-in and workspace, assistance, and admin previews.
+1. Build the API from [docs/API_CONTRACT.md](docs/API_CONTRACT.md) (schema proposal in
+   [docs/DATA_MODEL.md](docs/DATA_MODEL.md)).
+2. In `client/`, copy `.env.example` to `.env.local` and set `VITE_CAREWELL_DATA_MODE=api`.
+3. Run the API on `http://localhost:3000` (or set `VITE_DEV_PROXY_TARGET`); the Vite dev server proxies `/api/*`.
 
-Demo mutations are simulated in browser memory and reset on refresh. A demo booking is a pending request with a clearly simulated identifier, never a confirmed appointment. Demo sign-in is not identity verification or security. See the traceability matrix for incomplete frontend and backend-dependent requirements. Theme preference is stored locally; System follows the OS theme.
+API failures are shown to the user and never silently fall back to demo data.
+
+## Repository layout
+
+```text
+client/   React app (see docs/ARCHITECTURE.md)
+server/   Express API (to be built)
+docs/     Contracts and guides
+.github/  CI and GitHub Pages deployment
+```
+
+## Contributing
+
+- Follow the conventions in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Run `npm run check` in `client/` before opening a pull request.
+- Keep the API contract and the demo adapter in sync: the demo tests are the executable specification.

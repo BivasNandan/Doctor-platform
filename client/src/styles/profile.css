@@ -1,0 +1,196 @@
+/* Doctor profile page and booking sidebar. */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: -7px 0 18px;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  border: 0;
+  background: none;
+  font-size: 13px;
+}
+.back-link:hover {
+  color: var(--color-interactive-primary);
+}
+.profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 265px;
+  gap: 20px;
+  align-items: start;
+}
+.profile-main {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+}
+.profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 19px;
+  border-radius: 12px;
+}
+.profile-hero > img {
+  width: 124px;
+  height: 140px;
+  flex: none;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.profile-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.profile-hero h1 {
+  margin: 0 0 3px;
+  font-size: 29px;
+  letter-spacing: -1px;
+}
+.profile-specialty {
+  margin: 0 0 5px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+.profile-location {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 10px;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+.profile-section {
+  padding: 18px 20px;
+  border-radius: 11px;
+}
+.profile-section h2 {
+  margin: 5px 0 8px;
+  font-size: 18px;
+  letter-spacing: -0.4px;
+}
+.profile-section > p {
+  max-width: 650px;
+  margin: 0;
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.qualification-list {
+  display: grid;
+}
+.qualification-list > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.qualification-list > div:last-child {
+  border: 0;
+}
+.qual-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--color-success-text);
+  background: var(--color-success-bg);
+  border-radius: 50%;
+}
+.qualification-list > div > span:nth-child(2) {
+  display: grid;
+  flex: 1;
+  line-height: 1.5;
+}
+.qualification-list strong,
+.profile-clinic strong {
+  font-size: 13px;
+}
+.qualification-list small,
+.qual-year {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+.profile-clinic {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 10px;
+}
+.profile-clinic > img {
+  width: 60px;
+  height: 53px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.profile-clinic > div {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+.profile-clinic > div > span:not(.pill) {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+.review-row {
+  display: grid;
+  justify-items: start;
+  margin-top: 10px;
+}
+.review-stars {
+  color: #d4a03a;
+  letter-spacing: 1px;
+}
+.review-row p {
+  margin: 3px 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+.review-row small {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+}
+.booking-sticky {
+  position: sticky;
+  top: 84px;
+  padding: 17px;
+  border-radius: 12px;
+}
+.booking-sticky h3 {
+  margin: 7px 0 2px;
+  font-size: 19px;
+}
+.booking-sticky > p:not(.booking-assurance) {
+  margin: 0 0 16px;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+.booking-price {
+  display: flex;
+  justify-content: space-between;
+  margin: 14px 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+}
+.booking-price strong {
+  color: var(--color-text-primary);
+  font: 700 17px var(--font-display);
+}
+.booking-sticky > .button {
+  width: 100%;
+}
+.booking-assurance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin: 11px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
