@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix server start",
+    "verify:services": "npm --prefix server run verify:services"
+  },
+  "dependencies": {
+    "@neon/config": "^1.9.2",
+    "@neon/env": "^1.6.3"
+  }
+}

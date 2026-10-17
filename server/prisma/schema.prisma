@@ -1,0 +1,201 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum AppointmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  firstName    String    @map("first_name")
+  lastName     String    @map("last_name")
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         Role      @default(PATIENT)
+  isActive     Boolean   @default(true) @map("is_active")
+  lastSeenAt   DateTime? @map("last_seen_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  doctor       Doctor?
+  appointments Appointment[] @relation("PatientAppointments")
+  messages     Message[]
+
+  @@index([firstName, lastName])
+  @@map("users")
+}
+
+model Doctor {
+  id                 String             @id @default(uuid()) @db.Uuid
+  userId             String             @unique @map("user_id") @db.Uuid
+  qualifications     String?
+  experienceYears    Int?               @map("experience_years")
+  consultationFee    Decimal?           @map("consultation_fee") @db.Decimal(10, 2)
+  bio                String?
+  verificationStatus VerificationStatus @default(PENDING) @map("verification_status")
+  isPublished        Boolean            @default(false) @map("is_published")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialties       DoctorSpecialty[]
+  clinics           DoctorClinic[]
+  availabilitySlots AvailabilitySlot[]
+  appointments      Appointment[]
+
+  @@index([verificationStatus, isPublished])
+  @@map("doctors")
+}
+
+model Specialty {
+  id      String            @id @default(uuid()) @db.Uuid
+  name    String            @unique
+  doctors DoctorSpecialty[]
+
+  @@map("specialties")
+}
+
+model DoctorSpecialty {
+  doctorId    String @map("doctor_id") @db.Uuid
+  specialtyId String @map("specialty_id") @db.Uuid
+
+  doctor    Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  specialty Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, specialtyId])
+  @@index([specialtyId])
+  @@map("doctor_specialties")
+}
+
+model Clinic {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  address   String
+  city      String
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  doctors      DoctorClinic[]
+  appointments Appointment[]
+
+  @@index([city])
+  @@map("clinics")
+}
+
+model DoctorClinic {
+  doctorId String @map("doctor_id") @db.Uuid
+  clinicId String @map("clinic_id") @db.Uuid
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@id([doctorId, clinicId])
+  @@index([clinicId])
+  @@map("doctor_clinics")
+}
+
+model AvailabilitySlot {
+  id          String   @id @default(uuid()) @db.Uuid
+  doctorId    String   @map("doctor_id") @db.Uuid
+  startTime   DateTime @map("start_time")
+  endTime     DateTime @map("end_time")
+  isAvailable Boolean  @default(true) @map("is_available")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  doctor       Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+
+  @@index([doctorId, startTime])
+  @@map("availability_slots")
+}
+
+model Appointment {
+  id        String            @id @default(uuid()) @db.Uuid
+  patientId String            @map("patient_id") @db.Uuid
+  doctorId  String            @map("doctor_id") @db.Uuid
+  clinicId  String            @map("clinic_id") @db.Uuid
+  slotId    String            @map("slot_id") @db.Uuid
+  status    AppointmentStatus @default(PENDING)
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  patient      User             @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Restrict)
+  doctor       Doctor           @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  clinic       Clinic           @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  slot         AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  conversation Conversation?
+
+  @@index([patientId, status])
+  @@index([doctorId, status])
+  @@index([slotId, status])
+  @@map("appointments")
+}
+
+model Conversation {
+  id            String   @id @default(uuid()) @db.Uuid
+  appointmentId String   @unique @map("appointment_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  messages    Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  senderId       String    @map("sender_id") @db.Uuid
+  content        String?
+  readAt         DateTime? @map("read_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  conversation Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  attachments  MessageAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  fileUrl   String   @map("file_url")
+  fileName  String   @map("file_name")
+  fileType  String   @map("file_type")
+  fileSize  Int      @map("file_size")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("message_attachments")
+}
