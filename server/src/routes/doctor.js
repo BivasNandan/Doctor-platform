@@ -6,6 +6,7 @@ import { createSlot, createSlotSchema, listSlots, removeSlot, updateSlot, update
 import { prisma } from "../config/prisma.js";
 import { saveDoctorProfile, profileSchema } from "../doctorProfile.js";
 import { ApiError, notFound, parse, uuid } from "../http.js";
+import { LINKS, notifyAdmins } from "../notifications.js";
 import { appointmentInclude, doctorInclude, findDoctor, toAppointment } from "../mappers.js";
 
 /**
@@ -48,7 +49,17 @@ doctorRouter.patch("/profile", async (request, response) => {
 
   const changed = await saveDoctorProfile(doctor, data);
   const reviewRequired = changed.length > 0;
-  if (reviewRequired) await prisma.doctor.update({ where: { id }, data: { profileReviewRequired: true } });
+  if (reviewRequired) {
+    await prisma.doctor.update({ where: { id }, data: { profileReviewRequired: true } });
+    const names = { specialtyId: "specialty", qualifications: "qualifications", facilityIds: "clinics" };
+    await notifyAdmins({
+      kind: "doctor",
+      title: "A doctor profile needs review",
+      body: `${data.name} changed their ${changed.map((field) => names[field]).join(", ")}.`,
+      link: LINKS.adminVerification,
+      groupKey: `review:${id}`,
+    });
+  }
   response.json({ ...(await findDoctor(id)), reviewRequired });
 });
 
@@ -69,7 +80,7 @@ doctorRouter.patch("/appointments/:id", async (request, response) => {
   const { status } = parse(z.object({ status: z.enum(["accepted", "rejected"], { error: "Choose accepted or rejected." }) }), request.body);
   const appointment = await prisma.appointment.findFirst({ where: { id, doctorId: ownDoctorId(request) } });
   if (!appointment) throw notFound("This request");
-  response.json(await changeAppointmentStatus(appointment, status, DOCTOR_TRANSITIONS));
+  response.json(await changeAppointmentStatus(appointment, status, DOCTOR_TRANSITIONS, "doctor"));
 });
 
 // ── Availability ──────────────────────────────────────────────────────────────────────────

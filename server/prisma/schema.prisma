@@ -113,6 +113,7 @@ model User {
   sessions             Session[]
   emailVerifications   EmailVerification[]
   passwordResets       PasswordReset[]
+  notifications        Notification[]
   supportRequests      SupportRequest[]
   auditEntries         AuditLog[]
   decidedDeactivations DeactivationRequest[] @relation("DeactivationDecider")
@@ -432,4 +433,26 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("audit_log")
+}
+
+/// One line in a user's notification (bell) menu. groupKey merges repeated events about the same thing
+/// (for example "message:<conversationId>") into one unread row.
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  /// appointment | message | doctor | account | support
+  kind      String
+  title     String
+  body      String    @default("")
+  /// In-app route to open when the notification is clicked.
+  link      String?
+  groupKey  String?   @map("group_key")
+  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@map("notifications")
 }

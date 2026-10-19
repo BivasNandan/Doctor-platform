@@ -5,6 +5,7 @@ import { prisma } from "../config/prisma.js";
 import { DOCUMENT_TYPES, MAX_FILE_BYTES, discardUpload, saveUpload } from "../files.js";
 import { ApiError, conflict, notFound, parse, uuid } from "../http.js";
 import { findDoctor, toUser } from "../mappers.js";
+import { LINKS, notifyAdmins } from "../notifications.js";
 import { receiveFile } from "../upload.js";
 
 /**
@@ -73,7 +74,9 @@ onboardingRouter.post("/auth/doctor/register", async (request, response) => {
     },
     include: { doctor: { select: { id: true } } },
   });
+  await prisma.conversation.create({ data: { kind: "doctor_admin", doctorId: user.doctor.id } });
   await startSession(request, response, user.id);
+  await notifyAdmins({ kind: "doctor", title: "New doctor awaiting verification", body: `${data.name} registered and is waiting for review.`, link: LINKS.adminVerification });
   response.status(201).json({ user: toUser(user), doctor: await findDoctor(user.doctor.id) });
 });
 
@@ -105,6 +108,13 @@ onboardingRouter.post(
     const stored = await saveUpload(`certificates/${doctorId}`, request.file);
     try {
       const row = await prisma.doctorCertificate.create({ data: { doctorId, storageKey: stored.storageKey, fileName: stored.fileName } });
+      await notifyAdmins({
+        kind: "doctor",
+        title: "A doctor uploaded a certificate",
+        body: `${request.user.name} uploaded "${row.fileName}" for review.`,
+        link: LINKS.adminVerification,
+        groupKey: `certificate:${doctorId}`,
+      });
       response.status(201).json(toCertificate(row));
     } catch (error) {
       await discardUpload(stored.storageKey); // never leave a file nobody can find
@@ -140,5 +150,7 @@ onboardingRouter.post("/doctor/account/deactivation-requests", doctorOnly, async
     prisma.deactivationRequest.create({ data: { doctorId, reason } }),
     prisma.user.update({ where: { id: request.user.id }, data: { accountStatus: "deactivation_requested" } }),
   ]);
+  const short = reason.length > 80 ? `${reason.slice(0, 79)}…` : reason;
+  await notifyAdmins({ kind: "doctor", title: "Deactivation request", body: `${request.user.name} asked to deactivate their account: "${short}"`, link: LINKS.adminDoctors });
   response.status(201).json({ status: "deactivation_requested" });
 });

@@ -70,6 +70,55 @@ describe("conversations", () => {
   });
 });
 
+describe("who can talk to whom", () => {
+  it("opens a thread for an accepted appointment that has none, for both sides", async () => {
+    const doctor = await people.createDoctor(clinic);
+    const patient = await people.createPatient();
+    await people.createAppointment(doctor, patient, clinic, { withConversation: false });
+
+    const forPatient = ok(await patient.client.get("/conversations"));
+    assert.equal(forPatient.length, 1);
+    assert.equal(forPatient[0].participantName, doctor.name);
+    assert.equal(forPatient[0].canMessage, true);
+    assert.equal(ok(await doctor.client.get("/conversations")).filter((item) => item.participantRole === "patient").length, 1);
+  });
+
+  it("lets the doctor write first, and the patient answer", async () => {
+    const { doctor, patient, conversation } = await pair();
+    ok(await doctor.client.post(`/conversations/${conversation.id}/messages`, { body: "Please bring your last report." }), 201);
+    assert.equal(ok(await patient.client.get("/conversations"))[0].unread, 1);
+    ok(await patient.client.post(`/conversations/${conversation.id}/messages`, { body: "Will do, thank you." }), 201);
+    assert.deepEqual(ok(await doctor.client.get(`/conversations/${conversation.id}/messages`)).map((message) => message.isMine), [true, false]);
+  });
+
+  it("gives every new doctor a thread with the administration from the start", async () => {
+    const admin = await people.createAdmin();
+    const created = ok(
+      await admin.client.post("/admin/doctors", {
+        name: "Dr. Brand New",
+        email: "brand.new@test.local",
+        specialtyId: "cardiology",
+        qualifications: ["MBBS"],
+        experienceYears: 2,
+        fee: 500,
+        location: "Dhaka",
+        facilityIds: [clinic.id],
+      }),
+      201,
+    );
+    const seen = ok(await admin.client.get("/conversations")).find((item) => item.participantId === created.id);
+    assert.equal(seen.participantName, "Dr. Brand New");
+    assert.equal(seen.canMessage, true);
+
+    const registered = await ctx.client().post("/auth/doctor/register", {
+      name: "Dr. Self Registered", email: "self.reg@test.local", phone: "+880 1711 000000", password: "doctor-pass-123",
+      specialtyId: "cardiology", qualifications: ["MBBS"], experienceYears: 2, fee: 500, location: "Dhaka", facilityIds: [clinic.id],
+    });
+    const doctorId = ok(registered, 201).doctor.id;
+    assert.ok(ok(await admin.client.get("/conversations")).some((item) => item.participantId === doctorId));
+  });
+});
+
 describe("messages", () => {
   it("lets both sides write, in order, with isMine for each viewer", async () => {
     const { doctor, patient, conversation } = await pair();

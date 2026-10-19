@@ -4,6 +4,7 @@ import { PATIENT_TRANSITIONS, changeAppointmentStatus } from "../appointments.js
 import { rateLimit, requireRole } from "../auth.js";
 import { prisma } from "../config/prisma.js";
 import { ApiError, conflict, notFound, parse, uuid } from "../http.js";
+import { LINKS, notify, notifyDoctor, preview } from "../notifications.js";
 import { appointmentInclude, clock, dateKey, dhakaNow, minutesOf, timeLabel, toAppointment, toDbDate } from "../mappers.js";
 
 /**
@@ -122,7 +123,21 @@ bookingRouter.post("/appointment-requests", patientOnly, async (request, respons
     },
     include: appointmentInclude,
   });
-  response.status(201).json(toAppointment(created));
+  const result = toAppointment(created);
+  const forWhom = data.relationship === "self" ? "" : ` (for their ${data.relationship === "other" ? "family member" : data.relationship})`;
+  await notifyDoctor(created.doctorId, {
+    kind: "appointment",
+    title: "New appointment request",
+    body: `${result.patientName}${forWhom} asked for ${result.date} at ${result.time}: "${preview(data.reason)}"`,
+    link: LINKS.doctorDashboard,
+  });
+  await notify(request.user.id, {
+    kind: "appointment",
+    title: "Appointment request sent",
+    body: `Your request to ${result.doctor.name} for ${result.date} at ${result.time} is waiting for an answer.`,
+    link: LINKS.appointments,
+  });
+  response.status(201).json(result);
 });
 
 /** GET /appointments: the signed-in patient's own requests, including ones made for family. */
@@ -142,5 +157,5 @@ bookingRouter.patch("/appointment-requests/:id", patientOnly, async (request, re
   // Someone else's request answers 404, exactly like one that does not exist.
   const appointment = await prisma.appointment.findFirst({ where: { id, patientId: request.user.id } });
   if (!appointment) throw notFound("This request");
-  response.json(await changeAppointmentStatus(appointment, status, PATIENT_TRANSITIONS));
+  response.json(await changeAppointmentStatus(appointment, status, PATIENT_TRANSITIONS, "patient"));
 });

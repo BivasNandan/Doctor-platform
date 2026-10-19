@@ -12,6 +12,7 @@ import {
   updateSlotSchema,
 } from "../availability.js";
 import { ApiError, conflict, notFound, parse, uuid } from "../http.js";
+import { LINKS, notifyDoctor } from "../notifications.js";
 import { assertReferences, profileFields, profileSchema, saveDoctorProfile } from "../doctorProfile.js";
 import {
   appointmentInclude,
@@ -24,6 +25,14 @@ import {
   toFacility,
   toSpecialty,
 } from "../mappers.js";
+
+// What a doctor is told when the administration decides on their profile.
+const VERIFICATION_NOTICE = {
+  verified: ["Your profile was verified", "The administration verified your credentials. Once it is published, patients can find and book you."],
+  rejected: ["Your profile was not approved", "The administration could not approve your profile. Check your details and certificates, or message the administration."],
+  suspended: ["Your profile was suspended", "Your profile is hidden from patients for now. Please contact the administration."],
+  pending: ["Your profile is back in review", "The administration is reviewing your profile again."],
+};
 
 /** Everything here is for administrators only. */
 export const adminRouter = Router();
@@ -110,6 +119,7 @@ adminRouter.post("/doctors", async (request, response) => {
     },
     include: { doctor: true },
   });
+  await prisma.conversation.create({ data: { kind: "doctor_admin", doctorId: user.doctor.id } });
   const doctor = await findDoctor(user.doctor.id);
   await audit(request, "doctor.create", "doctor", doctor.id, undefined, doctor);
   response.status(201).json(doctor);
@@ -124,6 +134,7 @@ adminRouter.patch("/doctors/:id", async (request, response) => {
   await saveDoctorProfile(before, data);
   const after = await findDoctor(id);
   await audit(request, "doctor.update", "doctor", id, undefined, after);
+  await notifyDoctor(id, { kind: "doctor", title: "Your profile was updated", body: "The administration updated your profile details.", link: LINKS.doctorDashboard, groupKey: `profile-admin:${id}` });
   response.json(after);
 });
 
@@ -156,6 +167,10 @@ adminRouter.patch("/doctors/:id/verification", async (request, response) => {
 
   const after = await findDoctor(id);
   await audit(request, "doctor.verification", "doctor", id, { verificationStatus: doctor.verificationStatus, publicationStatus: doctor.publicationStatus }, { verificationStatus: status, publicationStatus: after.publicationStatus });
+  if (status !== doctor.verificationStatus) {
+    const [title, body] = VERIFICATION_NOTICE[status];
+    await notifyDoctor(id, { kind: "doctor", title, body, link: LINKS.doctorDashboard });
+  }
   response.json(after);
 });
 
@@ -172,6 +187,13 @@ adminRouter.patch("/doctors/:id/publication", async (request, response) => {
 
   const after = await findDoctor(id);
   await audit(request, "doctor.publication", "doctor", id, { publicationStatus: doctor.publicationStatus }, { publicationStatus: status });
+  if (status !== doctor.publicationStatus)
+    await notifyDoctor(id, {
+      kind: "doctor",
+      title: status === "published" ? "Your profile is now visible to patients" : "Your profile is now hidden",
+      body: status === "published" ? "Patients can find you and request appointments." : "Patients can no longer find your profile. Contact the administration if this is unexpected.",
+      link: LINKS.doctorDashboard,
+    });
   response.json(after);
 });
 
@@ -259,9 +281,17 @@ adminRouter.patch("/appointments/:id", async (request, response) => {
   const appointment = await prisma.appointment.findUnique({ where: { id } });
   if (!appointment) throw notFound("This request");
 
-  const updated = await changeAppointmentStatus(appointment, status, ADMIN_TRANSITIONS);
+  const updated = await changeAppointmentStatus(appointment, status, ADMIN_TRANSITIONS, "admin");
   await audit(request, "appointment.status", "appointment", id, { status: appointment.status }, { status });
   response.json(updated);
+});
+
+const scheduleNotice = (doctorId, body) => ({
+  kind: "doctor",
+  title: "Your schedule was changed by the administration",
+  body,
+  link: LINKS.doctorDashboard,
+  groupKey: `schedule-admin:${doctorId}`,
 });
 
 // ── Availability (any doctor's schedule) ───────────────────────────────────────────────────
@@ -273,6 +303,7 @@ adminRouter.post("/availability", async (request, response) => {
   const { doctorId, ...data } = parse(slotSchema.extend({ doctorId: z.string().uuid("Choose a doctor.") }), request.body);
   const slot = await createSlot(doctorId, data);
   await audit(request, "slot.create", "slot", slot.id, undefined, slot);
+  await notifyDoctor(doctorId, scheduleNotice(doctorId, `Added ${slot.date} at ${slot.startTime}.`));
   response.status(201).json(slot);
 });
 
@@ -280,12 +311,15 @@ adminRouter.patch("/availability/:id", async (request, response) => {
   const id = uuid(request.params.id, "This availability slot");
   const { before, after } = await updateSlot(id, parse(updateSlotSchema, request.body));
   await audit(request, "slot.update", "slot", id, before, after);
+  await notifyDoctor(after.doctorId, scheduleNotice(after.doctorId, `Changed ${after.date} at ${after.startTime} (${after.status}).`));
   response.json(after);
 });
 
 adminRouter.delete("/availability/:id", async (request, response) => {
   const id = uuid(request.params.id, "This availability slot");
+  const removed = await prisma.availabilitySlot.findUnique({ where: { id }, select: { doctorId: true, date: true, startTime: true } });
   await removeSlot(id);
   await audit(request, "slot.delete", "slot", id);
+  if (removed) await notifyDoctor(removed.doctorId, scheduleNotice(removed.doctorId, "A slot was removed."));
   response.status(204).end();
 });

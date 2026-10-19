@@ -33,13 +33,21 @@ First run only: put `SEED_ADMIN_PASSWORD` in the root `.env.local` and run `npm 
 administrator (`SEED_ADMIN_EMAIL`), the specialties and the first clinics. `npm test` in `server/` runs the API tests
 in a temporary schema inside Neon, so real data is never touched.
 
-**Status:** built and tested: the admin API (doctors, clinics, specialties, appointments, availability, summary) and
-core accounts (patient sign-up, email verification, forgot/reset password, profile, change password). Booking, the
-doctor workspace, messaging, support and doctor registration are still on the demo backend in the client.
+**Status:** every endpoint of the API contract is built and tested: administrator tools, accounts (sign-up, email
+verification, password reset, profile), patient booking, the doctor workspace, doctor registration with certificates,
+messaging (patient↔doctor, doctor↔administration) with attachments, support requests, deactivation requests and
+**notifications for all three roles**.
 
 Adding a feature: create `server/src/routes/<name>.js`, add one line to `server/src/routes/index.js`, and write
-`server/tests/<name>.test.js`. Shared helpers: `mail.js` (email), `upload.js` (file uploads), `http.js` (errors and
-validation), `auth.js` (sessions, roles, rate limits).
+`server/tests/<name>.test.js`. Shared helpers: `mail.js` (email), `upload.js` / `files.js` (file uploads and storage),
+`http.js` (errors and validation), `auth.js` (sessions, roles, rate limits) and `notifications.js`.
+
+**Notifying people.** When something happens that another person should know about, call
+`notify(userId, { kind, title, body, link, groupKey })`, `notifyDoctor(doctorId, …)` or `notifyAdmins(…)` after the
+action succeeded (see `appointments.js` for a full example). It never throws, so a notification cannot break the
+action. Give repeated events about one thing the same `groupKey` (for example `message:<conversationId>`) so they stay
+a single unread line; clear it with `markGroupRead` when the person looks at it. Add a test that checks who is
+told, and who is not (never the person who acted).
 
 The Vite dev server forwards `/api/*` to `VITE_DEV_PROXY_TARGET` (default `http://localhost:3000`), so the browser sees
 one origin: no CORS configuration is needed in development and cookies stay same-site. In production serve the client

@@ -2,6 +2,7 @@ import { accountsRouter } from "./accounts.js";
 import { adminRouter } from "./admin.js";
 import { adminReviewRouter } from "./adminReview.js";
 import { messagingRouter } from "./messaging.js";
+import { notificationsRouter } from "./notifications.js";
 import { onboardingRouter } from "./onboarding.js";
 import { supportRouter } from "./support.js";
 import { authRouter } from "./auth.js";
@@ -21,6 +22,7 @@ export function mountRoutes(api) {
   api.use(onboardingRouter); // doctors: /auth/doctor/register, /doctor/certificates, /doctor/account/deactivation-requests
   api.use(messagingRouter); // /conversations, /attachments
   api.use(supportRouter); // /support-requests
+  api.use(notificationsRouter); // /notifications (the bell menu, every role)
   api.use(catalogRouter); // public: /clinics, /specialties, /doctors
   api.use(bookingRouter); // patients: /doctors/:id/slots, /appointment-requests, /appointments
   api.use("/doctor", doctorRouter); // doctors: own profile, requests and availability

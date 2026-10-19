@@ -3,6 +3,7 @@ import { z } from "zod";
 import { rateLimit } from "../auth.js";
 import { prisma } from "../config/prisma.js";
 import { parse } from "../http.js";
+import { notifyAdmins, preview } from "../notifications.js";
 
 /** The "Assistance" form: anyone can write to the Carewell team, signed in or not. */
 export const supportRouter = Router();
@@ -31,5 +32,6 @@ supportRouter.post("/support-requests", async (request, response) => {
       email: email ?? request.user?.email,
     },
   });
+  await notifyAdmins({ kind: "support", title: "New support request", body: preview(message), link: "/admin" });
   response.status(201).json({ id: created.id, status: created.status });
 });

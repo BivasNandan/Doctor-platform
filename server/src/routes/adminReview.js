@@ -6,6 +6,7 @@ import { sendStoredFile } from "../files.js";
 import { ApiError, conflict, notFound, parse, uuid } from "../http.js";
 import { sendMail } from "../mail.js";
 import { findDoctors } from "../mappers.js";
+import { LINKS, notify, notifyDoctor, preview } from "../notifications.js";
 
 /**
  * Administrator screens for doctor onboarding and support: certificates, deactivation requests
@@ -92,6 +93,8 @@ adminReviewRouter.post("/deactivation-requests/:id/approve", async (request, res
   ]);
   await revokeAllSessions(found.doctor.userId);
   await audit(request, "deactivation.approve", "doctor", found.doctorId, { accountStatus: found.doctor.user.accountStatus }, { accountStatus: "deactivated" });
+  // The account is closed now; this waits for the doctor if the account is ever reactivated.
+  await notifyDoctor(found.doctorId, { kind: "account", title: "Your account was deactivated", body: "The administration approved your deactivation request." });
   const row = await prisma.deactivationRequest.findUnique({ where: { id: found.id }, include: deactivationInclude });
   response.json(toDeactivation(row));
 });
@@ -101,6 +104,7 @@ adminReviewRouter.post("/deactivation-requests/:id/decline", async (request, res
   const found = await decide(request, "declined");
   await prisma.user.updateMany({ where: { id: found.doctor.userId, accountStatus: "deactivation_requested" }, data: { accountStatus: "active" } });
   await audit(request, "deactivation.decline", "doctor", found.doctorId, undefined, { accountStatus: "active" });
+  await notifyDoctor(found.doctorId, { kind: "account", title: "Deactivation request declined", body: "Your account stays active. Message the administration if you have questions.", link: LINKS.messages });
   const row = await prisma.deactivationRequest.findUnique({ where: { id: found.id }, include: deactivationInclude });
   response.json(toDeactivation(row));
 });
@@ -131,6 +135,13 @@ adminReviewRouter.patch("/support-requests/:id", async (request, response) => {
   if (!before) throw notFound("This request");
   const row = await prisma.supportRequest.update({ where: { id }, data: { status }, include: supportInclude });
   await audit(request, "support.status", "support_request", id, { status: before.status }, { status });
+  if (before.userId && status !== before.status)
+    await notify(before.userId, {
+      kind: "support",
+      title: status === "resolved" ? "Your support request was resolved" : "Your support request is being handled",
+      body: preview(before.message),
+      link: LINKS.messages,
+    });
   response.json(toSupport(row));
 });
 
@@ -155,5 +166,6 @@ adminReviewRouter.post("/support-requests/:id/reply", async (request, response) 
 
   const row = await prisma.supportRequest.update({ where: { id }, data: { status: resolve ? "resolved" : "in_progress" }, include: supportInclude });
   await audit(request, "support.reply", "support_request", id, { status: found.status }, { status: row.status, reply: message });
+  if (found.userId) await notify(found.userId, { kind: "support", title: "Carewell support replied", body: preview(message), link: LINKS.messages });
   response.json(toSupport(row));
 });

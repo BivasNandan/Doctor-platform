@@ -117,10 +117,38 @@ Rules:
 | 👤 | `POST /conversations/:id/messages` | `{ body }` (1–2000 chars) | `201 Message` (`isMine: true`) |
 | 👤 | `POST /conversations/:id/attachments` | multipart field `file` | `201 Message` with `attachmentUrl`, `attachmentName` |
 
-- Patient ↔ doctor threads are allowed only after that doctor has **accepted** a request from the patient → otherwise `403 MESSAGING_NOT_ELIGIBLE`.
-- Doctor ↔ administration has its own thread.
-- Attachments: PDF, JPEG, PNG, WebP, GIF, ≤ 10 MB. Re-validate type by content, scan, store outside the web root, and authorise downloads per participant.
-- Real-time delivery, presence (`online`) and read receipts (`readAt`) are not implemented by the client yet. Plan a WebSocket/SSE channel (_open decision_).
+| 👤 | `GET /conversations/unread-count` | – | `200 { count }` |
+| 🛡️ | `POST /conversations` | `{ doctorId }` | `201 Conversation` (opens the administration thread with that doctor, once) |
+| 👤 | `GET /attachments/:id` | – | the file (only the two people in that conversation) |
+
+- Who talks to whom: **patient ↔ doctor** (only while the doctor has an accepted or completed appointment with that patient, otherwise `403 MESSAGING_NOT_ELIGIBLE`; either side may write first) and **doctor ↔ administration** (always open; one thread per doctor, shared by every administrator, created when the doctor account is created or registers).
+- Opening a conversation (`GET …/messages`) marks the other side's messages as read; `readAt` on your own messages shows when they were read.
+- Attachments: PDF, JPEG, PNG, WebP, GIF, ≤ 10 MB, type checked against the file's bytes, stored in the private bucket, downloaded only by participants.
+- **Live updates:** the client polls (conversations every ~8 s, the open conversation every ~4 s, paused while the tab is hidden). Push delivery (WebSocket/SSE) and presence (`online`) are not implemented.
+
+### Notifications (every role)
+
+| | Endpoint | Request | Success |
+| --- | --- | --- | --- |
+| 👤 | `GET /notifications` | `limit` (1–100, default 30), `unread=true` | `200 { items: Notification[], unreadCount }`, newest first |
+| 👤 | `GET /notifications/unread-count` | – | `200 { count }` |
+| 👤 | `POST /notifications/:id/read` | – | `200 Notification` (someone else's → `404`) |
+| 👤 | `POST /notifications/read-all` | – | `200 { updated }` |
+
+`Notification` = `{ id, kind: "appointment" \| "message" \| "doctor" \| "account" \| "support", title, body, link?, read, createdAt }`, where `link` is an in-app route. The client polls every ~10 s and shows a toast for new items. A notification never breaks the action that caused it. It is created for the people **other than** the one who acted:
+
+| Event | Who is notified |
+| --- | --- |
+| New appointment request | the doctor (and a "request sent" note to the patient) |
+| Doctor accepts / rejects | the patient |
+| Patient cancels | the doctor |
+| Administrator accepts / rejects / cancels / completes | the patient and the doctor |
+| New message (text or file) | the other side; repeated messages in one conversation stay **one unread entry**, cleared when the conversation is opened |
+| Doctor registers, uploads a certificate, changes specialty / qualifications / clinics, asks to deactivate | every administrator |
+| Administrator verifies, rejects, suspends, publishes or hides a profile; edits a profile or schedule; decides a deactivation request | the doctor |
+| New support request | every administrator |
+| Support status change or reply | the person who sent it (if signed in) |
+| Email verified, password changed or reset | that user |
 
 ### Doctor workspace (🩺)
 

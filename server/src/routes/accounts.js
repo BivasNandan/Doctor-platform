@@ -15,6 +15,7 @@ import { prisma } from "../config/prisma.js";
 import { ApiError, parse } from "../http.js";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../mail.js";
 import { toUser } from "../mappers.js";
+import { LINKS, notify } from "../notifications.js";
 
 /**
  * Account lifecycle: patient sign-up, email verification, forgotten password, profile and
@@ -108,6 +109,7 @@ accountsRouter.post("/verify-email", patientOnly, async (request, response) => {
     prisma.emailVerification.update({ where: { id: pending.id }, data: { consumedAt: new Date() } }),
     prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() }, include: withDoctor }),
   ]);
+  await notify(user.id, { kind: "account", title: "Email verified", body: "Welcome to Carewell! You can now book appointments.", link: "/discover" });
   response.json({ user: toUser(verified) });
 });
 
@@ -173,6 +175,7 @@ accountsRouter.post("/reset-password", async (request, response) => {
   // Opening the emailed link also proves the address is theirs.
   await prisma.user.updateMany({ where: { id: reset.userId, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
   await revokeAllSessions(reset.userId); // anyone using the old password is signed out
+  await notify(reset.userId, { kind: "account", title: "Your password was reset", body: "If this was not you, contact Carewell support straight away." });
   response.json({ reset: true });
 });
 
@@ -204,5 +207,6 @@ accountsRouter.post("/change-password", signedIn, async (request, response) => {
 
   await prisma.user.update({ where: { id: request.user.id }, data: { passwordHash: await hashPassword(input.newPassword) } });
   await revokeOtherSessions(request.user.id, request.sessionId); // other devices must sign in again
+  await notify(request.user.id, { kind: "account", title: "Your password was changed", body: "Other devices were signed out. If this was not you, reset your password and contact support.", link: LINKS.profile });
   response.json({ changed: true });
 });

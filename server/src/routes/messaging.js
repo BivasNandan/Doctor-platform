@@ -4,6 +4,7 @@ import { rateLimit, requireRole } from "../auth.js";
 import { prisma } from "../config/prisma.js";
 import { ATTACHMENT_TYPES, MAX_FILE_BYTES, discardUpload, saveUpload, sendStoredFile } from "../files.js";
 import { ApiError, notFound, parse, uuid } from "../http.js";
+import { LINKS, markGroupRead, notify, preview } from "../notifications.js";
 import { receiveFile } from "../upload.js";
 
 /**
@@ -56,6 +57,40 @@ const unreadWhere = (user) => ({
   readAt: null,
   ...(user.role === "admin" ? { sender: { role: { not: "admin" } } } : { senderId: { not: user.id } }),
 });
+
+// ── Notifying the other side ──────────────────────────────────────────────────────────────
+const groupKeyOf = (conversationId) => `message:${conversationId}`;
+
+/** Tells whoever is on the other side of the conversation that something arrived. */
+async function announceMessage(conversation, sender, text) {
+  const fromAdmin = sender.role === "admin";
+  let recipients;
+  if (conversation.kind === "patient_doctor") recipients = sender.role === "patient" ? [conversation.doctor.userId] : [conversation.patientId];
+  else if (fromAdmin) recipients = [conversation.doctor.userId];
+  else recipients = (await prisma.user.findMany({ where: { role: "admin", accountStatus: "active" }, select: { id: true } })).map((admin) => admin.id);
+
+  await notify(recipients, {
+    kind: "message",
+    title: `New message from ${fromAdmin ? ADMIN_NAME : sender.name}`,
+    body: text,
+    link: LINKS.messages,
+    groupKey: groupKeyOf(conversation.id),
+  });
+}
+
+/**
+ * A patient↔doctor thread normally opens when the doctor accepts a request. This also opens one for
+ * any accepted or completed appointment that has none (for example one accepted before messaging
+ * existed), so nobody who is allowed to talk is left without a thread.
+ */
+async function ensurePairThreads(user) {
+  const where = {
+    status: { in: ["accepted", "completed"] },
+    ...(user.role === "patient" ? { patientId: user.id } : { doctorId: user.doctor?.id ?? "" }),
+  };
+  const pairs = await prisma.appointment.findMany({ where, distinct: ["doctorId", "patientId"], select: { doctorId: true, patientId: true } });
+  if (pairs.length) await prisma.conversation.createMany({ data: pairs.map((pair) => ({ kind: "patient_doctor", ...pair })), skipDuplicates: true });
+}
 
 // ── Shapes ────────────────────────────────────────────────────────────────────────────────
 function participantFor(conversation, user) {
@@ -137,10 +172,12 @@ async function describeConversations(conversations, user) {
 messagingRouter.get("/conversations", async (request, response) => {
   const user = request.user;
   let where;
-  if (user.role === "patient") where = { kind: "patient_doctor", patientId: user.id };
-  else if (user.role === "doctor") {
+  if (user.role === "patient") {
+    await ensurePairThreads(user);
+    where = { kind: "patient_doctor", patientId: user.id };
+  } else if (user.role === "doctor") {
     if (!user.doctor?.id) throw notFound("Your doctor profile");
-    await ensureAdminThread(user.doctor.id);
+    await Promise.all([ensureAdminThread(user.doctor.id), ensurePairThreads(user)]);
     where = { doctorId: user.doctor.id };
   } else where = { kind: "doctor_admin" };
 
@@ -187,6 +224,7 @@ messagingRouter.get("/conversations/:id/messages", async (request, response) => 
   });
   const result = messages.reverse().map((message) => toMessage(message, request.user));
   await prisma.message.updateMany({ where: { conversationId: conversation.id, ...unreadWhere(request.user) }, data: { readAt: new Date() } });
+  await markGroupRead(request.user.id, groupKeyOf(conversation.id));
   response.json(result);
 });
 
@@ -204,6 +242,7 @@ messagingRouter.post("/conversations/:id/messages", async (request, response) =>
     data: { conversationId: conversation.id, senderId: request.user.id, body },
     include: messageInclude,
   });
+  await announceMessage(conversation, request.user, preview(body));
   response.status(201).json(toMessage(message, request.user));
 });
 
@@ -227,6 +266,7 @@ messagingRouter.post(
         },
         include: messageInclude,
       });
+      await announceMessage(conversation, request.user, `Sent a file: ${stored.fileName}`);
       response.status(201).json(toMessage(message, request.user));
     } catch (error) {
       await discardUpload(stored.storageKey);
