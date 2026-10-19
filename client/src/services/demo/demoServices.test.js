@@ -52,7 +52,7 @@ describe("public discovery", () => {
   });
 
   it("combines filters", async () => {
-    const result = await doctorService.list({ specialty: "dermatology", maxFee: 1300, language: "English" });
+    const result = await doctorService.list({ specialty: "dermatology", maxFee: 1300, verified: true });
     expect(result.map((d) => d.id)).toEqual(["d2"]);
     expect(await doctorService.list({ specialty: "dermatology", maxFee: 100 })).toEqual([]);
   });
@@ -278,7 +278,6 @@ describe("admin rules", () => {
       name: "Dr. Test Person",
       specialtyId: "cardiology",
       qualifications: ["MBBS"],
-      languages: ["English"],
       experienceYears: 3,
       fee: 900,
       location: "Gulshan",

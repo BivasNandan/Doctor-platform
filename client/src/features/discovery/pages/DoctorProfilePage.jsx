@@ -98,9 +98,6 @@ export default function DoctorProfilePage() {
                 {doctor.qualifications.map((qualification) => (
                   <Pill key={qualification}>{qualification}</Pill>
                 ))}
-                {doctor.languages.map((language) => (
-                  <Pill key={language}>{language}</Pill>
-                ))}
               </div>
             </div>
           </section>

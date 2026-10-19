@@ -22,8 +22,6 @@ export const doctorService = {
           includes(facilityText(doctor), filters.location)) &&
         (!filters.clinic || includes(facilityText(doctor), filters.clinic)) &&
         (!filters.verified || doctor.verificationStatus === "verified") &&
-        (!filters.language ||
-          doctor.languages.some((language) => language.toLowerCase() === filters.language.toLowerCase())) &&
         (!filters.available || doctor.availability.some((bucket) => includes(bucket, filters.available))) &&
         (!filters.maxFee || doctor.fee <= Number(filters.maxFee)) &&
         (!search ||

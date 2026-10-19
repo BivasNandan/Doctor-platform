@@ -10,8 +10,8 @@ _Backend dependency_.
 | PRD IDs | Frontend implementation | Backend dependency |
 | --- | --- | --- |
 | FR-01–03 Search by name, specialty, clinic, location; empty state | `features/discovery/pages/DirectoryPage.jsx`, `DiscoverSearch.jsx`, `useDoctorFilters.js` (filters in URL) | `GET /doctors` search semantics, relevance, performance |
-| FR-04–08 Filters (specialty, area, fee, language, availability, verified) | `DoctorFilters.jsx`; combined with AND in `services/demo/catalog.js` | Same filters server-side; availability buckets derived from real slots |
-| FR-09–14 Public profile: credentials, languages, clinics, fees, verification badge, directions, availability | `DoctorProfilePage.jsx`, `DoctorCard.jsx`, `FacilityCard.jsx` | Published-only filtering, per-clinic fees (`feesByFacility`), real availability |
+| FR-04–08 Filters (specialty, area, fee, availability, verified) | `DoctorFilters.jsx`; combined with AND in `services/demo/catalog.js` | Same filters server-side; availability buckets derived from real slots |
+| FR-09–14 Public profile: credentials, clinics, fees, verification badge, directions, availability | `DoctorProfilePage.jsx`, `DoctorCard.jsx`, `FacilityCard.jsx` | Published-only filtering, per-clinic fees (`feesByFacility`), real availability |
 | FR-15–18 Admin verification, approve/reject/suspend, publication | `features/admin/pages/VerificationPage.jsx`, `DoctorManagementPage.jsx` | Authoritative decisions, certificate upload/review, audit log |
 | FR-19–24 Availability, slots, past-date and overlap checks, block/unblock | `features/availability/AvailabilityManager.jsx`, `booking/steps/ScheduleStep.jsx` | Slot persistence, exclusion constraint, slot generation for patients |
 | FR-25–33 Appointment request: details, validation, pending status, history, cancel | `features/booking/*`, `features/appointments/*`, `utils/validation.js` | Conflict prevention (`409`), authoritative status, patient identity (open decision) |

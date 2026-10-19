@@ -7,7 +7,6 @@ export const DEFAULT_FILTERS = Object.freeze({
   specialty: "",
   location: "",
   maxFee: "",
-  language: "",
   available: "",
   verified: false,
 });
@@ -24,7 +23,6 @@ export function useDoctorFilters() {
       specialty: params.get("specialty") ?? "",
       location: params.get("location") ?? "",
       maxFee: params.get("maxFee") ?? "",
-      language: params.get("language") ?? "",
       available: params.get("available") ?? "",
       verified: params.get("verified") === "true",
     }),

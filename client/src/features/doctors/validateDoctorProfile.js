@@ -9,7 +9,6 @@ export function validateDoctorProfile(profile) {
   if (profile.name.length < 5) errors.name = "Enter the doctor's full name.";
   if (!profile.specialtyId) errors.specialtyId = "Choose a specialty.";
   if (!profile.qualifications.length) errors.qualifications = "Add at least one qualification.";
-  if (!profile.languages.length) errors.languages = "Add at least one language.";
   if (!Number.isFinite(profile.fee) || profile.fee < 0) errors.fee = "Enter a non-negative fee.";
   if (!Number.isFinite(profile.experienceYears) || profile.experienceYears < 0)
     errors.experienceYears = "Enter the years of experience.";

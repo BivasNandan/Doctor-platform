@@ -40,8 +40,8 @@ export default function DoctorCard({ doctor, onBook }) {
               <Check size={12} /> Verified
             </Pill>
           )}
-          {doctor.languages.slice(0, 2).map((language) => (
-            <Pill key={language}>{language}</Pill>
+          {doctor.qualifications.slice(0, 2).map((qualification) => (
+            <Pill key={qualification}>{qualification}</Pill>
           ))}
         </div>
         <div className="doctor-footer">

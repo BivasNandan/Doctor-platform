@@ -43,15 +43,6 @@ export default function DoctorProfileFields({ doctor, specialties, facilities, e
           disabled={disabled}
         />
       </Field>
-      <Field label="Languages (comma separated)" error={errors.languages}>
-        <input
-          name="languages"
-          required
-          placeholder="Bangla, English"
-          defaultValue={joinList(doctor?.languages)}
-          disabled={disabled}
-        />
-      </Field>
       <Field label="Experience (years)" error={errors.experienceYears}>
         <input
           name="experienceYears"

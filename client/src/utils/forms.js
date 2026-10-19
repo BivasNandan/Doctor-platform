@@ -13,7 +13,6 @@ export function readDoctorProfileForm(form) {
     name: String(data.get("name") ?? "").trim(),
     specialtyId: String(data.get("specialtyId") ?? ""),
     qualifications: splitList(data.get("qualifications")),
-    languages: splitList(data.get("languages")),
     experienceYears: Number(data.get("experienceYears")),
     fee: Number(data.get("fee")),
     location: String(data.get("location") ?? "").trim(),

@@ -36,7 +36,6 @@
  * @property {string} [image]
  * @property {string[]} qualifications
  * @property {number} experienceYears
- * @property {string[]} languages
  * @property {number} fee                    Default consultation fee (BDT).
  * @property {Record<string, number>} [feesByFacility]
  * @property {VerificationStatus} verificationStatus
