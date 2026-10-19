@@ -24,8 +24,30 @@ if (missingVariables.length > 0) {
   throw new Error(`Missing required environment variables: ${missingVariables.join(", ")}`);
 }
 
+const nodeEnv = process.env.NODE_ENV ?? "development";
+
 export const env = {
+  nodeEnv,
+  isProduction: nodeEnv === "production",
   port: Number(process.env.PORT ?? 3000),
+  /** Browser origins allowed to call the API with cookies (CSRF + CORS allow-list). */
+  clientOrigins: (process.env.CLIENT_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  sessionDays: Number(process.env.SESSION_DAYS ?? 7),
+  /** bcrypt work factor. Lowered only by the test suite for speed. */
+  bcryptCost: Number(process.env.BCRYPT_COST ?? 12),
+  /** Public address of the website, used for links inside emails (HashRouter: appUrl + "#/path"). */
+  appUrl: (process.env.APP_URL ?? "http://127.0.0.1:5173/Doctor-platform/").replace(/\/?$/, "/"),
+  /** Outgoing email. Without SMTP_HOST the server prints emails to the console instead. */
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT ?? 465),
+    user: process.env.SMTP_USER,
+    password: process.env.SMTP_PASSWORD,
+    from: process.env.MAIL_FROM ?? process.env.SMTP_USER ?? "Carewell <no-reply@carewell.local>",
+  },
   databaseUrl: process.env.DATABASE_URL,
   storageEndpoint: process.env.AWS_ENDPOINT_URL_S3,
   storageAccessKeyId: process.env.AWS_ACCESS_KEY_ID,
