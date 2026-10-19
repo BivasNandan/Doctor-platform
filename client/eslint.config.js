@@ -23,7 +23,7 @@ export default [
     rules: {
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
-      "react/prop-types": "off", // JSDoc typedefs in src/types document shapes instead
+      "react/prop-types": "off", // JSDoc typedefs in src/types.js document shapes instead
       "no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
       eqeqeq: ["error", "always", { null: "ignore" }],
       "no-console": ["warn", { allow: ["error", "warn"] }],

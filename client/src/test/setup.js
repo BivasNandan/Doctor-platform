@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
-import { resetDemoDb } from "../services/demo/db.js";
+import { resetDemoDb } from "../services/demoBackend.js";
 
 // jsdom lacks these browser APIs.
 window.scrollTo = vi.fn();

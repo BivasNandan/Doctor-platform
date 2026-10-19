@@ -2,9 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
-import App from "../../app/App.jsx";
-import AppProviders from "../../app/AppProviders.jsx";
-import { DEMO_RESET_TOKEN } from "../../constants/demo.js";
+import App, { AppProviders } from "../../App.jsx";
+import { DEMO_RESET_TOKEN } from "../../constants.js";
 import { authService } from "../../services/index.js";
 
 function renderApp(path) {

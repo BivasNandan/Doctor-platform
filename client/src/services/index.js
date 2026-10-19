@@ -1,6 +1,7 @@
-import { config } from "../config/env.js";
-import * as api from "./api/index.js";
-import * as demo from "./demo/index.js";
+import { config } from "../constants.js";
+
+import * as api from "./api.js";
+import * as demo from "./demoBackend.js";
 
 /**
  * The service layer is the ONLY place that knows whether data comes from the
@@ -23,4 +24,4 @@ export const {
   adminService,
 } = adapter;
 
-export { ApiError, setUnauthorizedHandler } from "./http/httpClient.js";
+export { ApiError, setUnauthorizedHandler } from "./httpClient.js";

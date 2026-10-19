@@ -1,9 +1,9 @@
 # Carewell API contract (v1, proposed)
 
 This is the REST interface the React client expects. It is derived from the code in
-[`client/src/services/api/`](../client/src/services/api/), which is the executable source of truth: if the two ever
+[`client/src/services/api.js`](../client/src/services/api.js), which is the executable source of truth: if the two ever
 disagree, the code wins and this file needs updating. Response shapes are documented as JSDoc typedefs in
-[`client/src/types/contracts.js`](../client/src/types/contracts.js).
+[`client/src/types.js`](../client/src/types.js).
 
 > Status: **proposed**. No server exists yet. Anything marked _open decision_ should be agreed between
 > frontend and backend before it is built.
@@ -57,6 +57,18 @@ Legend: 🌐 public · 👤 any signed-in user · 🩺 doctor · 🛡️ admin.
 | 👤 | `POST /auth/logout` | – | `204` | Destroy the session server-side. |
 | 🌐 | `GET /auth/me` | – | `200 { user }` or `401` | Called on every page load to restore the session. |
 | 🌐 | `POST /auth/doctor/register` | `{ email, password, phone, name, specialtyId, qualifications[], experienceYears, fee, location, facilityIds[] }` | `201 { user, doctor }` | Creates the account and a profile with `verificationStatus: "pending"`, `publicationStatus: "unpublished"`, and signs the doctor in. |
+
+Patient accounts and password handling (all built and covered by `server/tests/accounts.test.js`):
+
+| | Endpoint | Request | Success | Notes |
+| --- | --- | --- | --- | --- |
+| 🌐 | `POST /auth/patient/register` | `{ name, email, phone, password }` | `201 { user }` (`emailVerified: false`) | Creates a patient, signs them in and emails a 6-digit code. `409 EMAIL_TAKEN`. The role is never taken from the request. |
+| 👤 | `POST /auth/verify-email` | `{ code }` | `200 { user }` | Codes last 15 min and allow 5 wrong tries (`422 INVALID_CODE`, then `429 TOO_MANY_ATTEMPTS`). Late codes get `410 CODE_EXPIRED`. |
+| 👤 | `POST /auth/verify-email/resend` | – | `200 { sent }` | Replaces the old code. `429 RATE_LIMITED` within 30 s of the last one. |
+| 🌐 | `POST /auth/forgot-password` | `{ email }` | `200 { sent: true }` | Same answer whether or not the account exists. The emailed link is `<site>/#/reset-password?token=…`, valid 60 min, single use. |
+| 🌐 | `POST /auth/reset-password` | `{ token, password }` | `200 { reset: true }` or `410 RESET_TOKEN_INVALID` | Signs the account out everywhere. Also how an administrator-created doctor sets a first password. |
+| 👤 | `PATCH /auth/me` | `{ name, phone? }` | `200 { user }` | Email and role cannot be changed here. |
+| 👤 | `POST /auth/change-password` | `{ currentPassword, newPassword }` | `200 { changed: true }` | Other devices are signed out; the current one stays signed in. |
 
 `user` = `{ id, role: "doctor"\|"admin"\|"patient", name?, email?, doctorId?, accountStatus? }`.
 Blocked accounts (`deactivated`, `suspended`) must get `403 ACCOUNT_RESTRICTED` at login.
@@ -135,7 +147,7 @@ Rules:
 | --- | --- | --- |
 | `GET /admin/summary` | – | `200 AdminSummary` |
 | `GET /admin/doctors` | – | `200 Doctor[]` (all statuses) |
-| `POST /admin/doctors` | doctor profile fields (as registration, without credentials) | `201 Doctor` (pending, unpublished) |
+| `POST /admin/doctors` | doctor profile fields plus the doctor's login `email` (no password: the doctor sets one through password reset) | `201 Doctor` (pending, unpublished), `409 EMAIL_TAKEN` |
 | `PATCH /admin/doctors/:id` | doctor profile fields | `200 Doctor` |
 | `POST /admin/doctors/:id/deactivation` | – | `200 Doctor` (`accountStatus: deactivated`, `publicationStatus: inactive`) |
 | `PATCH /admin/doctors/:id/verification` | `{ status: "pending"\|"verified"\|"rejected"\|"suspended" }` | `200 Doctor` |
@@ -161,7 +173,7 @@ Rules:
 
 ## Status vocabularies
 
-Stored and returned exactly as written (see [`client/src/constants/statuses.js`](../client/src/constants/statuses.js)):
+Stored and returned exactly as written (see [`client/src/constants.js`](../client/src/constants.js)):
 
 | Field | Values |
 | --- | --- |

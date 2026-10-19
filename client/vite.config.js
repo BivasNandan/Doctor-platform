@@ -32,6 +32,8 @@ export default defineConfig(({ mode }) => {
 
     test: {
       environment: "jsdom",
+      // Tests always run against the in-memory demo backend, whatever .env.local says.
+      env: { VITE_CAREWELL_DATA_MODE: "demo" },
       setupFiles: "./src/test/setup.js",
       css: false,
       include: ["src/**/*.test.{js,jsx}"],

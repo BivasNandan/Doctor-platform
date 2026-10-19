@@ -1,3 +1,4 @@
+/* ═══ components ═══ */
 /* Shared primitives: headings, buttons, pills. */
 .eyebrow {
   color: var(--color-brand-secondary);
@@ -143,4 +144,217 @@ h3 {
 .pill-rating {
   color: #9a6500;
   background: #fff7df;
+}
+
+/* ═══ ui ═══ */
+/* Styles for the shared UI primitives in src/components/ui. */
+
+/* Form additions ------------------------------------------------------- */
+.form-grid select,
+.form-grid textarea,
+.inline-add-form select,
+.inline-add-form textarea,
+.patient-form-grid select {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-surface-primary);
+  font-size: 12px;
+}
+.form-grid textarea,
+.inline-add-form textarea {
+  min-height: 70px;
+  padding-top: 8px;
+  resize: vertical;
+}
+.patient-form-grid .field-wide,
+.form-grid .check-group {
+  grid-column: 1 / -1;
+}
+.field-hint {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.form-grid .form-error,
+.patient-form-grid .form-error {
+  margin-top: 0;
+}
+.fieldset-reset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.availability-fields {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+.fieldset-reset:disabled {
+  opacity: 0.6;
+}
+.check-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.check-group legend {
+  padding: 0 0 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.check-group > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.check-option {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px !important;
+  padding: 6px 10px;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  background: var(--color-surface-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.check-option input {
+  width: auto !important;
+  min-height: 0 !important;
+  accent-color: var(--color-interactive-primary);
+}
+.check-option:has(input:checked) {
+  color: var(--color-interactive-primary);
+  border-color: var(--color-interactive-primary);
+  background: var(--color-selected-bg);
+}
+
+.form-link {
+  margin: 10px 0 0;
+}
+
+/* Loading and status --------------------------------------------------- */
+.page-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border-default);
+  border-top-color: var(--color-interactive-primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Confirm dialog ------------------------------------------------------- */
+.confirm-dialog {
+  width: min(420px, 100%);
+  padding: 22px;
+  border-radius: 14px;
+  background: var(--color-glass-bg-strong);
+  box-shadow: var(--shadow-lg);
+  animation: dialog-in 0.24s ease both;
+}
+.confirm-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  letter-spacing: -0.4px;
+}
+.confirm-dialog p {
+  margin: 0 0 6px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+/* Sidebar help link (was a <button>; now a router link) ---------------- */
+.help-card .help-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  color: var(--color-brand-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Accessibility -------------------------------------------------------- */
+.skip-link {
+  position: fixed;
+  z-index: 100;
+  top: 8px;
+  left: 8px;
+  padding: 8px 14px;
+  color: #fff;
+  border-radius: 8px;
+  background: var(--color-interactive-primary);
+  font-size: 14px;
+  font-weight: 700;
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: none;
+}
+.page-content:focus {
+  outline: none;
+}
+
+/* Messaging attachments ------------------------------------------------ */
+.attachment-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 14px 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 9px;
+  background: var(--color-surface-secondary);
+  font-size: 12px;
+}
+.attachment-preview img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.attachment-preview span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attachment-preview button {
+  padding: 4px 8px;
+  color: var(--color-interactive-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+}
+.message-bubble a {
+  display: block;
+  margin-top: 4px;
+  color: inherit;
+  text-decoration: underline;
 }

@@ -8,12 +8,12 @@ integration.
 
 1. [`API_CONTRACT.md`](API_CONTRACT.md) – every endpoint, payload, status code and business rule the client expects.
 2. [`DATA_MODEL.md`](DATA_MODEL.md) – the Prisma schema explained: relationships, the rules the database enforces, and how API fields map to columns.
-3. [`client/src/services/demo/`](../client/src/services/demo/) – a **working reference implementation** of the rules in
+3. [`client/src/services/demoBackend.js`](../client/src/services/demoBackend.js) – a **working reference implementation** of the rules in
    plain JavaScript (validation, transitions, scoping). Port the behaviour, not the code.
-4. [`client/src/services/api/`](../client/src/services/api/) – the exact HTTP calls the client makes.
-5. [`client/src/types/contracts.js`](../client/src/types/contracts.js) – response shapes.
+4. [`client/src/services/api.js`](../client/src/services/api.js) – the exact HTTP calls the client makes.
+5. [`client/src/types.js`](../client/src/types.js) – response shapes.
 
-The demo tests ([`demoServices.test.js`](../client/src/services/demo/demoServices.test.js)) double as an executable
+The demo tests ([`demoBackend.test.js`](../client/src/services/demoBackend.test.js)) double as an executable
 specification: each `it(...)` is a business rule your API should also satisfy.
 
 ## 2. Run the pair locally
@@ -28,6 +28,18 @@ cp .env.example .env.local        # then set VITE_CAREWELL_DATA_MODE=api
 npm install
 npm run dev                       # http://localhost:5173/Doctor-platform/
 ```
+
+First run only: put `SEED_ADMIN_PASSWORD` in the root `.env.local` and run `npm run seed` in `server/`. It creates the
+administrator (`SEED_ADMIN_EMAIL`), the specialties and the first clinics. `npm test` in `server/` runs the API tests
+in a temporary schema inside Neon, so real data is never touched.
+
+**Status:** built and tested: the admin API (doctors, clinics, specialties, appointments, availability, summary) and
+core accounts (patient sign-up, email verification, forgot/reset password, profile, change password). Booking, the
+doctor workspace, messaging, support and doctor registration are still on the demo backend in the client.
+
+Adding a feature: create `server/src/routes/<name>.js`, add one line to `server/src/routes/index.js`, and write
+`server/tests/<name>.test.js`. Shared helpers: `mail.js` (email), `upload.js` (file uploads), `http.js` (errors and
+validation), `auth.js` (sessions, roles, rate limits).
 
 The Vite dev server forwards `/api/*` to `VITE_DEV_PROXY_TARGET` (default `http://localhost:3000`), so the browser sees
 one origin: no CORS configuration is needed in development and cookies stay same-site. In production serve the client
@@ -46,7 +58,7 @@ server/
 │  │  ├─ pool.js             # pg Pool
 │  │  └─ migrations/         # SQL or node-pg-migrate files, one per change
 │  ├─ middleware/            # authenticate, requireRole, validate, rateLimit, errorHandler
-│  ├─ modules/               # one folder per resource, mirrors client/src/services/api
+│  ├─ modules/               # one folder per resource, mirrors client/src/services/api.js
 │  │  ├─ auth/               #   routes.js · controller.js · service.js · repository.js · schema.js
 │  │  ├─ doctors/
 │  │  ├─ facilities/
