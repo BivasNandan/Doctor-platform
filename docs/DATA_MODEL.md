@@ -1,226 +1,121 @@
-# Proposed PostgreSQL data model
+# Data model
 
-A starting point derived from what the UI reads and writes (see [`API_CONTRACT.md`](API_CONTRACT.md)). It is a
-**proposal**, not a mandate: adjust names and normalisation as the backend team sees fit, but keep the API
-responses compatible with the contract.
+The source of truth is [`server/prisma/schema.prisma`](../server/prisma/schema.prisma) (PostgreSQL on Neon). This page
+explains the design, how it lines up with the API contract in [`API_CONTRACT.md`](API_CONTRACT.md), and the rules to
+follow when changing it.
 
-Design notes:
+## Principles
 
-- UUID primary keys, `timestamptz` timestamps, snake_case columns. The API maps to camelCase JSON.
-- Business rules that must hold under concurrency are enforced **in the database** (unique/exclusion constraints),
-  not only in application code.
-- Passwords are stored as Argon2id/bcrypt hashes. Files live in object storage; the DB stores only keys.
+- **Names match the API.** Field and enum names follow the contract, so the server can return rows with little or no
+  renaming and the React client needs no changes.
+- **Lower-case enum values** (`pending`, `accepted`, …). Prisma returns exactly what the API sends: no case conversion.
+- **Derived values are not stored:** `nextAvailable`, the `Today / Tomorrow / This week` buckets, the `booked` slot
+  state, unread counts, `emailVerified`. Storing them would let them drift out of sync.
+- **The database refuses bad data.** Rules that must hold under concurrency (no double booking, no overlapping slots,
+  consistent slot / doctor / clinic) are constraints, not just application checks.
 
-```sql
-CREATE EXTENSION IF NOT EXISTS pgcrypto;   -- gen_random_uuid()
-CREATE EXTENSION IF NOT EXISTS citext;     -- case-insensitive email
-CREATE EXTENSION IF NOT EXISTS btree_gist; -- exclusion constraints on uuid + ranges
+## Entities and relationships
 
--- Enumerations (values are part of the API contract) -------------------------
-CREATE TYPE user_role           AS ENUM ('patient', 'doctor', 'admin');
-CREATE TYPE account_status      AS ENUM ('active', 'suspended', 'deactivated', 'deactivation_requested');
-CREATE TYPE verification_status AS ENUM ('pending', 'verified', 'rejected', 'suspended');
-CREATE TYPE publication_status  AS ENUM ('published', 'unpublished', 'inactive');
-CREATE TYPE facility_type       AS ENUM ('clinic', 'hospital');
-CREATE TYPE slot_status         AS ENUM ('available', 'booked', 'unavailable');
-CREATE TYPE appointment_status  AS ENUM ('pending', 'accepted', 'rejected', 'cancelled', 'completed');
+```text
+User ──1:0..1── Doctor ──N:1── Specialty
+  │                │
+  │                ├──N:M── Clinic            (via DoctorClinic: optional per-clinic fee)
+  │                │
+  │                └──1:N── AvailabilitySlot ──(doctor + clinic must be a DoctorClinic pair)
+  │                              │
+  │ (patient)                    └──1:N── Appointment ──N:1── User (patient)
+  │                                          doctorId + clinicId must match the slot
+  │
+  ├──1:N── Session · EmailVerification · PasswordReset · SupportRequest · AuditLog (actor)
+  │
+  └── Conversation (patient + doctor, or doctor + admin) ──1:N── Message ──1:N── MessageAttachment
 
--- Identity ---------------------------------------------------------------------
-CREATE TABLE users (
-  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email          citext NOT NULL UNIQUE,
-  password_hash  text   NOT NULL,
-  role           user_role      NOT NULL,
-  name           text   NOT NULL,
-  phone          text,
-  account_status account_status NOT NULL DEFAULT 'active',
-  created_at     timestamptz    NOT NULL DEFAULT now(),
-  updated_at     timestamptz    NOT NULL DEFAULT now()
-);
-
--- Reference data -----------------------------------------------------------------
-CREATE TABLE specialties (
-  id          text PRIMARY KEY,                 -- slug, e.g. 'cardiology'
-  name        text NOT NULL UNIQUE,
-  description text NOT NULL DEFAULT '',
-  active      boolean NOT NULL DEFAULT true
-);
-
-CREATE TABLE facilities (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          text NOT NULL,
-  type          facility_type NOT NULL,
-  address       text NOT NULL,
-  area          text NOT NULL,
-  city          text NOT NULL,
-  phone         text NOT NULL,
-  opening_hours text,
-  image_url     text,
-  latitude      numeric(9,6),                   -- enables "distanceKm" later
-  longitude     numeric(9,6),
-  active        boolean NOT NULL DEFAULT true,
-  created_at    timestamptz NOT NULL DEFAULT now()
-);
-
--- Doctors --------------------------------------------------------------------------
-CREATE TABLE doctors (
-  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id                uuid NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT,
-  specialty_id           text NOT NULL REFERENCES specialties(id),
-  photo_url              text,
-  qualifications         text[] NOT NULL DEFAULT '{}',
-  languages              text[] NOT NULL DEFAULT '{}',
-  experience_years       smallint NOT NULL CHECK (experience_years BETWEEN 0 AND 60),
-  default_fee            integer  NOT NULL CHECK (default_fee >= 0),    -- BDT
-  location               text NOT NULL,
-  verification_status    verification_status NOT NULL DEFAULT 'pending',
-  publication_status     publication_status  NOT NULL DEFAULT 'unpublished',
-  profile_review_required boolean NOT NULL DEFAULT false,
-  created_at             timestamptz NOT NULL DEFAULT now(),
-  updated_at             timestamptz NOT NULL DEFAULT now(),
-  -- A profile can only be public while verified.
-  CONSTRAINT published_requires_verified
-    CHECK (publication_status <> 'published' OR verification_status = 'verified')
-);
-CREATE INDEX doctors_public_idx ON doctors (specialty_id) WHERE publication_status = 'published';
-
-CREATE TABLE doctor_facilities (
-  doctor_id   uuid NOT NULL REFERENCES doctors(id)    ON DELETE CASCADE,
-  facility_id uuid NOT NULL REFERENCES facilities(id) ON DELETE RESTRICT,
-  fee         integer CHECK (fee >= 0),                  -- NULL = use doctors.default_fee
-  PRIMARY KEY (doctor_id, facility_id)
-);
-
-CREATE TABLE doctor_certificates (                       -- admin verification evidence
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  doctor_id   uuid NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-  storage_key text NOT NULL,
-  file_name   text NOT NULL,
-  uploaded_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE deactivation_requests (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  doctor_id  uuid NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-  reason     text NOT NULL,
-  status     text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'approved', 'declined')),
-  decided_by uuid REFERENCES users(id),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  decided_at timestamptz
-);
-
--- Scheduling -----------------------------------------------------------------------
-CREATE TABLE availability_slots (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  doctor_id   uuid NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-  facility_id uuid NOT NULL REFERENCES facilities(id),
-  slot_date   date NOT NULL,
-  start_time  time NOT NULL,
-  end_time    time NOT NULL,
-  status      slot_status NOT NULL DEFAULT 'available',
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT slot_time_order CHECK (start_time < end_time),
-  -- No overlapping, non-blocked slots for the same doctor and clinic (-> 409 SLOT_OVERLAP).
-  CONSTRAINT slot_no_overlap EXCLUDE USING gist (
-    doctor_id   WITH =,
-    facility_id WITH =,
-    tsrange(slot_date + start_time, slot_date + end_time) WITH &&
-  ) WHERE (status <> 'unavailable')
-);
--- The service layer must also check that (doctor_id, facility_id) exists in doctor_facilities
--- and that slot_date is not in the past.
-
-CREATE TABLE appointment_requests (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  doctor_id        uuid NOT NULL REFERENCES doctors(id),
-  facility_id      uuid NOT NULL REFERENCES facilities(id),
-  slot_id          uuid REFERENCES availability_slots(id),
-  patient_user_id  uuid REFERENCES users(id),             -- NULL for guest bookings (open decision)
-  patient_name     text NOT NULL,
-  patient_phone    text NOT NULL,
-  patient_email    citext NOT NULL,
-  reason           text NOT NULL,
-  appointment_date date NOT NULL,
-  appointment_time time NOT NULL,
-  status           appointment_status NOT NULL DEFAULT 'pending',
-  created_at       timestamptz NOT NULL DEFAULT now(),
-  updated_at       timestamptz NOT NULL DEFAULT now()
-);
--- At most one ACCEPTED request per time (-> 409 APPOINTMENT_CONFLICT). Pending requests may coexist.
-CREATE UNIQUE INDEX appointment_one_accepted_per_time
-  ON appointment_requests (doctor_id, facility_id, appointment_date, appointment_time)
-  WHERE status = 'accepted';
-CREATE INDEX appointment_by_doctor_idx  ON appointment_requests (doctor_id, appointment_date);
-CREATE INDEX appointment_by_patient_idx ON appointment_requests (patient_user_id);
-
--- Messaging ------------------------------------------------------------------------
-CREATE TABLE conversations (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  kind            text NOT NULL CHECK (kind IN ('patient_doctor', 'doctor_admin')),
-  doctor_id       uuid NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
-  patient_user_id uuid REFERENCES users(id),               -- NULL for doctor_admin
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (kind, doctor_id, patient_user_id)
-);
--- NULL patient ids never collide in the UNIQUE above, so guard the admin thread explicitly.
-CREATE UNIQUE INDEX conversations_one_admin_thread ON conversations (doctor_id) WHERE kind = 'doctor_admin';
-
-CREATE TABLE attachments (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  uploader_id     uuid NOT NULL REFERENCES users(id),
-  storage_key     text NOT NULL,
-  file_name       text NOT NULL,
-  mime_type       text NOT NULL,
-  size_bytes      integer NOT NULL CHECK (size_bytes <= 10485760),
-  created_at      timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE messages (
-  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  sender_id       uuid NOT NULL REFERENCES users(id),
-  body            text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
-  attachment_id   uuid REFERENCES attachments(id),
-  sent_at         timestamptz NOT NULL DEFAULT now(),
-  read_at         timestamptz
-);
-CREATE INDEX messages_by_conversation_idx ON messages (conversation_id, sent_at);
-
--- Support and governance -----------------------------------------------------------
-CREATE TABLE support_requests (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  email      citext,
-  message    text NOT NULL,
-  status     text NOT NULL DEFAULT 'received',
-  created_at timestamptz NOT NULL DEFAULT now()
-);
-
-CREATE TABLE audit_log (                                   -- append-only
-  id             bigserial PRIMARY KEY,
-  actor_user_id  uuid REFERENCES users(id),
-  action         text NOT NULL,                            -- e.g. 'doctor.verification.set'
-  entity_type    text NOT NULL,
-  entity_id      uuid,
-  before_state   jsonb,
-  after_state    jsonb,
-  created_at     timestamptz NOT NULL DEFAULT now()
-);
+Doctor ──1:N── DoctorCertificate · DeactivationRequest
 ```
 
-## Mapping notes
+| Relationship | Delete behaviour | Why |
+| --- | --- | --- |
+| User → Doctor | cascade | A doctor profile cannot exist without its account. |
+| Doctor → DoctorClinic, slots, certificates, requests | cascade | Owned data. |
+| Doctor → Appointment | **restrict** | History must not vanish. Deactivate (`accountStatus`, `publicationStatus: inactive`) instead of deleting. |
+| Patient (User) → Appointment | **restrict** | Same. |
+| Slot → Appointment | **restrict** | A slot with requests cannot be deleted. |
+| DoctorClinic → Slot | **no action** | A clinic link cannot be removed while the doctor still has slots there. |
+| Clinic → anything | **restrict** | Deactivate clinics (`active = false`) instead of deleting. |
+| Conversation → Message → Attachment | cascade | Owned data. |
+| User → Session / codes / tokens | cascade | Owned data. |
+| Actor / decider on AuditLog, DeactivationRequest, SupportRequest | set null | Keep the record if the user is removed. |
 
-| API field | Source |
-| --- | --- |
-| `Doctor.name`, `Doctor.accountStatus` | `users.name`, `users.account_status` |
-| `Doctor.specialty` | `specialties.name` (display label) |
-| `Doctor.facilityIds` | `doctor_facilities.facility_id[]` |
-| `Doctor.feesByFacility` | `doctor_facilities.fee` where not null |
-| `Doctor.fee` | `doctors.default_fee` |
-| `Doctor.nextAvailable`, `Doctor.availability` | derived from future `available` slots |
-| `AppointmentRequest.doctor` / `.facility` | joins on `doctors`/`users` and `facilities` |
-| `Conversation.canMessage` | exists an `accepted` appointment between the patient and doctor (or admin thread) |
-| `Message.isMine` | `messages.sender_id = current user` |
+### The booking chain
 
-Sessions: use a Postgres-backed store (e.g. `connect-pg-simple`) or Redis, with server-side invalidation on logout
-and on account deactivation.
+`Appointment (slotId, doctorId, clinicId) → AvailabilitySlot (id, doctorId, clinicId)` is a **composite foreign key**, and
+`AvailabilitySlot (doctorId, clinicId) → DoctorClinic`. Together they guarantee an appointment can only reference a slot
+that belongs to that doctor, at a clinic where that doctor actually practises. `doctorId` and `clinicId` repeat the
+slot's values only so lists can filter without a join. Date and time are **not** copied: they come from the slot.
+
+Consequence for the product: **patients can only book slots that a doctor (or an admin) has created.** The demo's fixed
+"4:30 PM / 5:30 PM …" times exist only in demo mode.
+
+## Rules enforced by the database
+
+Written as SQL in the migration, because Prisma cannot express them in the schema file.
+
+| Rule | Mechanism | API error to map it to |
+| --- | --- | --- |
+| At most one **accepted** request per slot (pending requests can queue) | partial unique index `appointments_one_accepted_per_slot` | `409 APPOINTMENT_CONFLICT` |
+| No overlapping bookable slots for one doctor at one clinic (blocked slots may overlap) | exclusion constraint `slots_no_overlap` | `409 SLOT_OVERLAP` |
+| A slot starts before it ends | check `slots_time_order` | `422` |
+| Only verified profiles can be published | check `doctors_published_requires_verified` | `409 NOT_VERIFIED` |
+| Fee ≥ 0, experience 0–60 years | checks | `422` |
+| A patient thread has a patient; the admin thread has none; one admin thread per doctor | check + partial unique index | `409` |
+| One thread per patient and doctor | unique `(doctorId, patientId)` | handled by "find or create" |
+| Message ≤ 2000 characters, attachment ≤ 10 MB | checks | `422` |
+
+When one of these fires, catch the Prisma error (`P2002` unique, `P2003` foreign key, or a raw constraint name from the
+error message) and translate it to the API error above.
+
+## How API fields map to the database
+
+| API (contract) | Database | Notes |
+| --- | --- | --- |
+| `user.name`, `user.email`, `user.phone` | `users.name / email / phone` | Store email lower-cased. |
+| `user.emailVerified` | `users.emailVerifiedAt IS NOT NULL` | |
+| `user.accountStatus`, `doctor.accountStatus` | `users.accountStatus` | |
+| `doctor.name`, `doctor.email` | the doctor's `User` row | Join `doctor.user`. |
+| `doctor.specialtyId` / `doctor.specialty` | `doctors.specialtyId` / `specialties.name` | `Specialty.id` is the slug, e.g. `cardiology`. |
+| `doctor.qualifications` | `doctors.qualifications` (`text[]`) | |
+| `doctor.fee`, `doctor.feesByFacility` | `doctors.fee`, `doctor_clinics.fee` | Whole BDT; map `{ [clinicId]: fee }` for non-null fees. |
+| `doctor.facilityIds` | `doctor_clinics.clinicId` | |
+| `doctor.verificationStatus`, `publicationStatus`, `profileReviewRequired` | same columns | |
+| `doctor.nextAvailable`, `doctor.availability` | **derived** from future slots without an accepted appointment | |
+| `facility.*` | `clinics` | API path is `/clinics`. `distanceKm` is optional/derived from `latitude`/`longitude`. |
+| `slot.date`, `startTime`, `endTime` | `availability_slots.date / startTime / endTime` | Clinic local time (Asia/Dhaka). Format `YYYY-MM-DD` and `HH:mm`. |
+| `slot.status` (`available`/`booked`/`unavailable`) | stored `available`/`unavailable`; `booked` = has an accepted appointment | |
+| `appointment.date`, `time` | the slot's date and start time | `time` is shown as `5:30 PM`. |
+| `appointment.doctor`, `appointment.facility` | joins on `doctor.user` and `clinic` | |
+| `appointment.relationship`, `patientName`, `phone`, `email`, `reason` | same columns on `appointments` | |
+| `conversation.canMessage` | an `accepted` appointment exists for this patient and doctor (always true for the admin thread) | Computed, not stored. |
+| `conversation.unread` | count of messages from others with `readAt IS NULL` | |
+| `message.sender`, `isMine` | `message.sender.role`, `senderId = current user` | |
+| `message.sentAt`, `readAt` | `createdAt`, `readAt` | |
+| `attachmentUrl` | signed URL built from `message_attachments.storageKey` | Bucket is private. |
+| `adminSummary.*` | counts and a monthly `GROUP BY` | No table needed. |
+
+## Working with the schema
+
+- **Always use migrations.** Change `schema.prisma`, run `npx prisma migrate dev --name <change>` locally, review the SQL,
+  commit it, and deploy with `npx prisma migrate deploy`. **Never** use `prisma db push`: it would drop the SQL-only rules
+  above because Prisma does not know about them. If you add another SQL-only rule, append it to the migration by hand.
+- **IDs are generated by Prisma Client**, not the database. Raw SQL inserts (the Neon console, seed scripts) must supply an
+  id, e.g. `gen_random_uuid()`.
+- **Do not edit an applied migration.** Add a new one.
+- **Develop against a Neon branch, not `production`.** `neon.ts` already supports per-branch settings.
+- **Dates:** timestamps are `timestamptz` (UTC). Slot `date` / `startTime` / `endTime` are clinic-local on purpose, so the
+  UI and the database agree and no time-zone conversion is needed.
+
+## Decisions to revisit
+
+- One specialty per doctor (the UI shows one). Supporting several means adding a join table back.
+- One conversation per patient and doctor, shared across visits.
+- No doctor languages (removed from the product).
+- `Session` serves both cookie sessions and refresh tokens, so the cookie-versus-JWT choice does not change the schema.

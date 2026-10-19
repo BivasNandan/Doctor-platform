@@ -7,7 +7,7 @@ integration.
 ## 1. What to read, in order
 
 1. [`API_CONTRACT.md`](API_CONTRACT.md) – every endpoint, payload, status code and business rule the client expects.
-2. [`DATA_MODEL.md`](DATA_MODEL.md) – a proposed PostgreSQL schema that enforces the rules with constraints.
+2. [`DATA_MODEL.md`](DATA_MODEL.md) – the Prisma schema explained: relationships, the rules the database enforces, and how API fields map to columns.
 3. [`client/src/services/demo/`](../client/src/services/demo/) – a **working reference implementation** of the rules in
    plain JavaScript (validation, transitions, scoping). Port the behaviour, not the code.
 4. [`client/src/services/api/`](../client/src/services/api/) – the exact HTTP calls the client makes.

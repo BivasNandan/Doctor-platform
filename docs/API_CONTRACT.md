@@ -56,7 +56,7 @@ Legend: 🌐 public · 👤 any signed-in user · 🩺 doctor · 🛡️ admin.
 | 🌐 | `POST /auth/login` | `{ email, password, portal: "doctor"\|"admin" }` | `200 { user }` | `portal` is only the sign-in page used. Decide the role from the account and reject a mismatch (the client also checks `user.role`). Never reveal whether the email exists. Rate-limit. |
 | 👤 | `POST /auth/logout` | – | `204` | Destroy the session server-side. |
 | 🌐 | `GET /auth/me` | – | `200 { user }` or `401` | Called on every page load to restore the session. |
-| 🌐 | `POST /auth/doctor/register` | `{ email, password, phone, name, specialtyId, qualifications[], languages[], experienceYears, fee, location, facilityIds[] }` | `201 { user, doctor }` | Creates the account and a profile with `verificationStatus: "pending"`, `publicationStatus: "unpublished"`, and signs the doctor in. |
+| 🌐 | `POST /auth/doctor/register` | `{ email, password, phone, name, specialtyId, qualifications[], experienceYears, fee, location, facilityIds[] }` | `201 { user, doctor }` | Creates the account and a profile with `verificationStatus: "pending"`, `publicationStatus: "unpublished"`, and signs the doctor in. |
 
 `user` = `{ id, role: "doctor"\|"admin"\|"patient", name?, email?, doctorId?, accountStatus? }`.
 Blocked accounts (`deactivated`, `suspended`) must get `403 ACCOUNT_RESTRICTED` at login.
@@ -65,9 +65,9 @@ Blocked accounts (`deactivated`, `suspended`) must get `403 ACCOUNT_RESTRICTED` 
 
 | | Endpoint | Query / body | Success |
 | --- | --- | --- | --- |
-| 🌐 | `GET /doctors` | `query`, `specialty` (id), `location`, `clinic`, `maxFee`, `language`, `available` (`Today`\|`Tomorrow`\|`This week`), `verified` (`true`) – all optional, combined with AND | `200 Doctor[]` |
+| 🌐 | `GET /doctors` | `query`, `specialty` (id), `location`, `clinic`, `maxFee`, `available` (`Today`\|`Tomorrow`\|`This week`), `verified` (`true`) – all optional, combined with AND | `200 Doctor[]` |
 | 🌐 | `GET /doctors/:id` | – | `200 Doctor` or `404` |
-| 🌐 | `GET /doctors/:id/slots` | `facilityId`, `date` | `200 OpenSlot[]` (`{ id?, label, status: "available"\|"booked"\|"passed" }`) |
+| 🌐 | `GET /doctors/:id/slots` | `facilityId`, `date` | `200 OpenSlot[]` (`{ id, label, status: "available"\|"booked"\|"passed" }`) |
 | 🌐 | `GET /clinics` | `type=clinic\|hospital` (optional) | `200 Facility[]` – active only |
 | 🌐 | `GET /specialties` | – | `200 Specialty[]` – active only |
 | 🌐 | `POST /support-requests` | `{ message, email? }` | `201 { id, status: "received" }` |
@@ -77,7 +77,7 @@ Rules:
 - `GET /doctors*` returns only **publicly listed** doctors: `verificationStatus = verified` is **not** required, but
   `publicationStatus = published` and `accountStatus ≠ deactivated` are. A doctor can only be published when verified.
 - `location` matches the doctor's `location` text **or** the name/area/city of any of their clinics.
-- `OpenSlot.label` is the display time (e.g. `"5:30 PM"`). If you return `id`, the client sends it back as `slotId`.
+- `OpenSlot.id` is the `availability_slots` id and `label` is its display start time (e.g. `"5:30 PM"`). The client sends the id back as `slotId`. Patients can only book slots that a doctor or admin created; the demo's fixed times exist only in demo mode.
 - The demo derives `Doctor.availability` (`Today`/`Tomorrow`/`This week`) and `nextAvailable`; the real API should compute them from availability slots.
 
 ### Patient appointments
@@ -85,7 +85,7 @@ Rules:
 | | Endpoint | Request | Success |
 | --- | --- | --- | --- |
 | 🌐/👤 | `GET /appointments` | – | `200 AppointmentRequest[]` scoped to the caller |
-| 🌐/👤 | `POST /appointment-requests` | `{ doctorId, facilityId, date, time, slotId?, patientName, phone, email, reason }` | `201 AppointmentRequest` (status `pending`) |
+| 🌐/👤 | `POST /appointment-requests` | `{ doctorId, facilityId, date, time, slotId, relationship, patientName, phone, email, reason }` | `201 AppointmentRequest` (status `pending`) |
 | 🌐/👤 | `PATCH /appointment-requests/:id` | `{ status: "cancelled" }` | `200 AppointmentRequest` or `409 INVALID_TRANSITION` |
 
 - `AppointmentRequest` embeds `doctor: { id, name, specialty, image? }` and `facility: { id, name, address, area, city }`
@@ -115,7 +115,7 @@ Rules:
 | Endpoint | Request | Success |
 | --- | --- | --- |
 | `GET /doctor/profile` | – | `200 Doctor` (own, any status) |
-| `PATCH /doctor/profile` | `{ name, specialtyId, qualifications[], languages[], experienceYears, fee, location, facilityIds[] }` | `200 Doctor & { reviewRequired }` |
+| `PATCH /doctor/profile` | `{ name, specialtyId, qualifications[], experienceYears, fee, location, facilityIds[] }` | `200 Doctor & { reviewRequired }` |
 | `GET /doctor/appointments` | – | `200 AppointmentRequest[]` (own only) |
 | `PATCH /doctor/appointments/:id` | `{ status: "accepted"\|"rejected" }` | `200 AppointmentRequest` or `409` (only `pending` can change) |
 | `GET /doctor/availability` | – | `200 AvailabilitySlot[]` |
