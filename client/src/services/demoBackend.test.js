@@ -10,6 +10,7 @@ import {
   doctorService,
   facilityService,
   messagingService,
+  notificationService,
   slotService,
 } from "./demoBackend.js";
 
@@ -350,6 +351,58 @@ describe("availability", () => {
     expect((await availabilityService.list("d1", { admin: true })).map((s) => s.id)).toContain(mine.id);
     await availabilityService.remove(mine.id, { admin: true });
     expect((await availabilityService.list("d1", { admin: true })).map((s) => s.id)).not.toContain(mine.id);
+  });
+});
+
+describe("notifications", () => {
+  const titles = async () => (await notificationService.list()).items.map((item) => item.title);
+
+  it("requires sign-in and is private to each role", async () => {
+    await expect(notificationService.list()).rejects.toMatchObject({ status: 401 });
+    await signInPatient();
+    const mine = await notificationService.list();
+    expect(mine.unreadCount).toBe(1);
+    expect(mine.items[0]).toMatchObject({ title: "Welcome to Carewell", read: false });
+    await expect(notificationService.markRead("demo-note-1")).rejects.toMatchObject({ status: 404 }); // the doctor's
+  });
+
+  it("marks one, then every notification as read", async () => {
+    await signInPatient();
+    await appointmentService.submit(booking());
+    expect((await notificationService.list()).unreadCount).toBe(2);
+    const [first] = (await notificationService.list()).items;
+    await notificationService.markRead(first.id);
+    expect((await notificationService.list()).unreadCount).toBe(1);
+    await expect(notificationService.markAllRead()).resolves.toMatchObject({ updated: 1 });
+    expect((await notificationService.list()).unreadCount).toBe(0);
+  });
+
+  it("tells the doctor about a new request and the patient about the answer", async () => {
+    await signInPatient();
+    await appointmentService.submit(booking());
+    const [request] = await appointmentService.list();
+    await authService.logout();
+
+    await signInDoctor();
+    expect(await titles()).toContain("New appointment request");
+    expect((await notificationService.list()).unreadCount).toBe(2);
+    await doctorPortalService.updateAppointmentStatus(request.id, "accepted");
+    await authService.logout();
+
+    await signInPatient();
+    const patientTitles = await titles();
+    expect(patientTitles).toContain("Appointment accepted");
+    expect(patientTitles).toContain("Appointment request sent");
+  });
+
+  it("tells the other side about a message", async () => {
+    await signInPatient();
+    await messagingService.sendMessage("c1", "Hello doctor");
+    await authService.logout();
+    await signInDoctor();
+    const [latest] = (await notificationService.list()).items;
+    expect(latest).toMatchObject({ kind: "message", link: "/messages" });
+    expect(latest.body).toBe("Hello doctor");
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { doctorsSearchPath } from "./constants.js";
 import {
   clockLabelToMinutes,
+  formatDateTime,
   formatFee,
   initials,
   isValidEmail,
@@ -10,6 +11,7 @@ import {
   parseDateKey,
   slugify,
   splitList,
+  timeAgo,
   validateAppointmentDetails,
   validateAttachment,
 } from "./utils.js";
@@ -80,6 +82,32 @@ describe("validation", () => {
     expect(validateAttachment({ type: "application/pdf", size: 1024 })).toBe("");
     expect(validateAttachment({ type: "application/zip", size: 1024 })).toMatch(/PDF, JPEG/);
     expect(validateAttachment({ type: "image/png", size: 11 * 1024 * 1024 })).toMatch(/smaller than 10 MB/);
+  });
+});
+
+describe("friendly times", () => {
+  const now = new Date(2026, 9, 19, 15, 0); // 19 Oct 2026, 3:00 PM
+
+  it("shows the time today, 'Yesterday' and dates after that", () => {
+    expect(formatDateTime(new Date(2026, 9, 19, 9, 5).toISOString(), now)).toMatch(/9:05/);
+    expect(formatDateTime(new Date(2026, 9, 18, 21, 30).toISOString(), now)).toMatch(/^Yesterday, /);
+    expect(formatDateTime(new Date(2026, 9, 3, 8, 0).toISOString(), now)).toMatch(/^Oct 3, /);
+    expect(formatDateTime(new Date(2025, 11, 25, 8, 0).toISOString(), now)).toMatch(/2025/);
+  });
+
+  it("leaves text that is not a timestamp alone", () => {
+    expect(formatDateTime("Demo", now)).toBe("Demo");
+    expect(formatDateTime(undefined, now)).toBe("");
+    expect(timeAgo("Demo", now)).toBe("Demo");
+  });
+
+  it("describes how long ago something happened", () => {
+    const ago = (ms) => new Date(now.getTime() - ms).toISOString();
+    expect(timeAgo(ago(10_000), now)).toBe("just now");
+    expect(timeAgo(ago(5 * 60_000), now)).toBe("5 min ago");
+    expect(timeAgo(ago(3 * 3_600_000), now)).toBe("3 h ago");
+    expect(timeAgo(ago(2 * 86_400_000), now)).toBe("2 d ago");
+    expect(timeAgo(ago(30 * 86_400_000), now)).toMatch(/Sep/);
   });
 });
 

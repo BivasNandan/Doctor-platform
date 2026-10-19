@@ -127,6 +127,10 @@ export const availabilityService = {
 
 export const messagingService = {
   listConversations: () => http.get("/conversations"),
+  /** Number of unread messages, for the navigation badge. */
+  unreadCount: () => http.get("/conversations/unread-count"),
+  /** Administrators: opens (or returns) the thread with a doctor. */
+  startConversation: (doctorId) => http.post("/conversations", { doctorId }),
   listMessages: (conversationId) => http.get(`/conversations/${segment(conversationId)}/messages`),
   sendMessage: (conversationId, body) =>
     http.post(`/conversations/${segment(conversationId)}/messages`, { body }),
@@ -135,6 +139,16 @@ export const messagingService = {
     form.append("file", file);
     return http.post(`/conversations/${segment(conversationId)}/attachments`, form);
   },
+};
+
+// ─── notifications ─────────────────────────────────────────────────────────────────────────
+
+/** The bell menu of whoever is signed in (patient, doctor or administrator). */
+export const notificationService = {
+  /** Resolves { items, unreadCount }, newest first. */
+  list: ({ limit = 30 } = {}) => http.get("/notifications", { query: { limit } }),
+  markRead: (id) => http.post(`/notifications/${segment(id)}/read`),
+  markAllRead: () => http.post("/notifications/read-all"),
 };
 
 // ─── admin ─────────────────────────────────────────────────────────────────────────────────

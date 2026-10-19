@@ -8,12 +8,43 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @template T
  * @param {() => Promise<T>} loader  Called on mount, whenever `deps` change and on `reload()`.
  * @param {unknown[]} [deps]         Values the loader depends on.
- * @param {{enabled?: boolean}} [options]
+ * @param {{enabled?: boolean, refreshMs?: number}} [options]
+ *   `refreshMs` re-runs the loader quietly every that many milliseconds (no loading flash, paused while
+ *   the tab is hidden, and refreshed as soon as the tab is visible again). Use it for live-ish data.
  * @returns {{data: T|undefined, error: Error|null, loading: boolean, reload: () => void, setData: Function}}
  */
-export function useResource(loader, deps = [], { enabled = true } = {}) {
+export function useResource(loader, deps = [], { enabled = true, refreshMs = 0 } = {}) {
   const [state, setState] = useState({ data: undefined, error: null, loading: enabled });
   const [version, setVersion] = useState(0);
+  const loaderRef = useRef(loader);
+  useEffect(() => {
+    loaderRef.current = loader;
+  });
+
+  useEffect(() => {
+    if (!enabled || !refreshMs) return undefined;
+    let cancelled = false;
+    const refresh = () => {
+      if (document.hidden) return;
+      loaderRef
+        .current()
+        .then((data) => {
+          if (!cancelled) setState((current) => ({ ...current, data, error: null }));
+        })
+        .catch(() => undefined); // a failed background refresh keeps showing the last good data
+    };
+    const timer = setInterval(refresh, refreshMs);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+    // The caller owns the dependency list, exactly like the loading effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, enabled, refreshMs]);
 
   useEffect(() => {
     if (!enabled) return undefined;

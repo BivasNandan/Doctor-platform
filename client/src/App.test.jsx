@@ -1,8 +1,9 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import App, { AppProviders } from "./App.jsx";
+import { useResource } from "./hooks.js";
 import { DEMO_VERIFICATION_CODE } from "./constants.js";
 
 vi.setConfig({ testTimeout: 20000 });
@@ -434,6 +435,105 @@ describe("shell", () => {
     await user.type(await screen.findByLabelText(/Your question/), "How do I change my appointment time?");
     await user.click(screen.getByRole("button", { name: /Send a message/ }));
     expect(await screen.findByText(/not delivered to anyone/)).toBeInTheDocument();
+  });
+});
+
+describe("notifications", () => {
+  it("keeps the bell disabled until someone signs in", async () => {
+    renderApp("/discover");
+    expect(
+      await screen.findByRole("button", { name: /^Notifications \(available after you sign in\)/ }),
+    ).toBeDisabled();
+  });
+
+  it("shows the unread count, lists what happened and opens the linked page", async () => {
+    const user = renderApp("/appointments");
+    await signIn(user);
+    const bell = await screen.findByRole("button", { name: "Notifications (1 unread)" });
+    await user.click(bell);
+
+    const panel = await screen.findByRole("dialog", { name: "Notifications" });
+    expect(within(panel).getByText("Welcome to Carewell")).toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: /Welcome to Carewell/ }));
+
+    // The linked page opens, the menu closes and the count is gone.
+    expect(await screen.findByRole("button", { name: "Notifications" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Notifications" })).not.toBeInTheDocument();
+  });
+
+  it("marks everything as read", async () => {
+    const user = renderApp("/appointments");
+    await signIn(user);
+    await user.click(await screen.findByRole("button", { name: "Notifications (1 unread)" }));
+    await user.click(await screen.findByRole("button", { name: "Mark all as read" }));
+    expect(await screen.findByRole("button", { name: "Notifications" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mark all as read" })).toBeDisabled();
+  });
+
+  it("gives doctors and administrators their own notifications", async () => {
+    const user = renderApp("/doctor/login");
+    await signIn(user);
+    await user.click(await screen.findByRole("button", { name: "Notifications (1 unread)" }));
+    expect(await screen.findByText("A demo patient asked for the next free time.")).toBeInTheDocument();
+  });
+});
+
+describe("background refresh", () => {
+  it("re-runs a loader quietly while mounted, without a loading flash", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const { result, unmount } = renderHook(() =>
+        useResource(async () => (calls += 1), [], { refreshMs: 1000 }),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      expect(result.current.data).toBe(1);
+      expect(result.current.loading).toBe(false);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(result.current.data).toBe(2);
+      expect(result.current.loading).toBe(false); // refreshed silently
+
+      unmount();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(calls).toBe(2); // nothing runs after unmount
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps the last good data when a refresh fails", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const { result } = renderHook(() =>
+        useResource(
+          async () => {
+            calls += 1;
+            if (calls > 1) throw new Error("offline");
+            return "first";
+          },
+          [],
+          { refreshMs: 1000 },
+        ),
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(result.current.data).toBe("first");
+      expect(result.current.error).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

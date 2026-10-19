@@ -99,6 +99,34 @@ function createDb() {
       },
     ],
     supportRequests: [],
+    notifications: [
+      {
+        role: "patient",
+        kind: "account",
+        title: "Welcome to Carewell",
+        body: "Demo mode: events like booking or messaging add notifications here.",
+        link: "/discover",
+      },
+      {
+        role: "doctor",
+        kind: "appointment",
+        title: "New appointment request",
+        body: "A demo patient asked for the next free time.",
+        link: "/doctor/dashboard",
+      },
+      {
+        role: "admin",
+        kind: "doctor",
+        title: "New doctor awaiting verification",
+        body: "A demo doctor registered and is waiting for review.",
+        link: "/admin/verification",
+      },
+    ].map((item, index) => ({
+      ...item,
+      id: `demo-note-${index}`,
+      read: false,
+      createdAt: new Date().toISOString(),
+    })),
     /** The signed-in demo identity (null = signed out / patient browsing). */
     session: null,
   };
@@ -120,6 +148,20 @@ export const nextId = (prefix = "DEMO") =>
 export async function reply(value) {
   if (demoConfig.latencyMs > 0) await new Promise((resolve) => setTimeout(resolve, demoConfig.latencyMs));
   return value === undefined ? value : clone(value);
+}
+
+/** Adds a notification for everybody signed in under `role` (the demo has one person per role). */
+export function pushNotification(role, { kind, title, body = "", link }) {
+  db.notifications.unshift({
+    id: nextId("DEMO-NOTE"),
+    role,
+    kind,
+    title,
+    body,
+    link,
+    read: false,
+    createdAt: new Date().toISOString(),
+  });
 }
 
 /** Mirrors the server's 401/403 checks so the UI never relies on lax demo rules. */
@@ -291,6 +333,12 @@ export const supportService = {
       simulated: true,
     };
     db.supportRequests.push(request);
+    pushNotification("admin", {
+      kind: "support",
+      title: "New support request",
+      body: request.message.slice(0, 90),
+      link: "/admin",
+    });
     return reply(request);
   },
 };
@@ -518,6 +566,18 @@ export const appointmentService = {
       simulated: true,
     };
     db.appointments = [request, ...db.appointments];
+    pushNotification("doctor", {
+      kind: "appointment",
+      title: "New appointment request",
+      body: `${request.patientName} asked for ${request.date} at ${request.time}.`,
+      link: "/doctor/dashboard",
+    });
+    pushNotification("patient", {
+      kind: "appointment",
+      title: "Appointment request sent",
+      body: "Your request is waiting for an answer.",
+      link: "/appointments",
+    });
     return reply(hydrate(request));
   },
 
@@ -529,6 +589,12 @@ export const appointmentService = {
       throw conflict("This request can no longer be cancelled.", "INVALID_TRANSITION");
     appointment.status = APPOINTMENT_STATUS.CANCELLED;
     appointment.simulated = true;
+    pushNotification("doctor", {
+      kind: "appointment",
+      title: "Appointment cancelled by the patient",
+      body: `${appointment.patientName} cancelled ${appointment.date} at ${appointment.time}.`,
+      link: "/doctor/dashboard",
+    });
     return reply(hydrate(appointment));
   },
 };
@@ -542,8 +608,45 @@ export function transitionAsDoctor(id, status) {
     throw conflict("Only pending requests can be accepted or rejected.", "INVALID_TRANSITION");
   appointment.status = status;
   if (status === APPOINTMENT_STATUS.ACCEPTED) ensureConversation(appointment);
+  pushNotification("patient", {
+    kind: "appointment",
+    title: status === APPOINTMENT_STATUS.ACCEPTED ? "Appointment accepted" : "Appointment not accepted",
+    body:
+      status === APPOINTMENT_STATUS.ACCEPTED
+        ? "Your doctor accepted the request. You can now send a message."
+        : "The doctor could not accept this time. You can choose another.",
+    link: status === APPOINTMENT_STATUS.ACCEPTED ? "/messages" : "/appointments",
+  });
   return appointment;
 }
+
+// ─── notifications ─────────────────────────────────────────────────────────────────────────
+
+export const notificationService = {
+  async list({ limit = 30 } = {}) {
+    const viewer = requireRole(ROLES.PATIENT, ROLES.DOCTOR, ROLES.ADMIN);
+    const mine = db.notifications.filter((item) => item.role === viewer.role);
+    return reply({
+      items: mine.slice(0, limit).map(({ role, ...item }) => item), // eslint-disable-line no-unused-vars
+      unreadCount: mine.filter((item) => !item.read).length,
+    });
+  },
+
+  async markRead(id) {
+    const viewer = requireRole(ROLES.PATIENT, ROLES.DOCTOR, ROLES.ADMIN);
+    const item = db.notifications.find((entry) => entry.id === id && entry.role === viewer.role);
+    if (!item) throw notFound("This notification");
+    item.read = true;
+    return reply(item);
+  },
+
+  async markAllRead() {
+    const viewer = requireRole(ROLES.PATIENT, ROLES.DOCTOR, ROLES.ADMIN);
+    const unread = db.notifications.filter((item) => item.role === viewer.role && !item.read);
+    unread.forEach((item) => (item.read = true));
+    return reply({ updated: unread.length });
+  },
+};
 
 // ─── doctorPortal ──────────────────────────────────────────────────────────────────────────
 
@@ -598,6 +701,12 @@ export const doctorPortalService = {
     const doctor = ownDoctor();
     if (!reason?.trim()) throw invalid("Provide a reason for the deactivation request.");
     doctor.accountStatus = ACCOUNT_STATUS.DEACTIVATION_REQUESTED;
+    pushNotification("admin", {
+      kind: "doctor",
+      title: "Deactivation request",
+      body: `${doctor.name} asked to deactivate their account.`,
+      link: "/admin/doctors",
+    });
     return reply({ status: ACCOUNT_STATUS.DEACTIVATION_REQUESTED });
   },
 };
@@ -778,7 +887,33 @@ export const messagingService = {
       simulated: true,
     };
     db.messages[conversationId] = [...(db.messages[conversationId] ?? []), message];
+    // The person on the other side of the conversation gets a notification.
+    const other =
+      viewer.role === ROLES.ADMIN
+        ? ROLES.DOCTOR
+        : viewer.role === ROLES.PATIENT
+          ? ROLES.DOCTOR
+          : conversation.participantRole === ROLES.ADMIN
+            ? ROLES.ADMIN
+            : ROLES.PATIENT;
+    pushNotification(other, {
+      kind: "message",
+      title: `New message from ${viewer.name ?? viewer.role}`,
+      body: text.slice(0, 90),
+      link: "/messages",
+    });
     return reply(message);
+  },
+
+  async unreadCount() {
+    requireViewer();
+    return reply({ count: 0 });
+  },
+
+  /** Administrators: the demo has a single doctor↔administration thread. */
+  async startConversation() {
+    const viewer = requireRole(ROLES.ADMIN);
+    return reply({ ...visibleConversations(viewer)[0], canMessage: true });
   },
 
   async sendAttachment() {
@@ -972,6 +1107,18 @@ export const adminService = {
     appointment.status = status;
     appointment.simulated = true;
     if (status === APPOINTMENT_STATUS.ACCEPTED) ensureConversation(appointment);
+    pushNotification("patient", {
+      kind: "appointment",
+      title: `Appointment ${status}`,
+      body: "The administration updated your request.",
+      link: "/appointments",
+    });
+    pushNotification("doctor", {
+      kind: "appointment",
+      title: `Appointment ${status} by the administration`,
+      body: `${appointment.patientName}, ${appointment.date} at ${appointment.time}.`,
+      link: "/doctor/dashboard",
+    });
     return reply(hydrate(appointment));
   },
 };

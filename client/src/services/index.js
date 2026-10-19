@@ -21,6 +21,7 @@ export const {
   doctorPortalService,
   availabilityService,
   messagingService,
+  notificationService,
   adminService,
 } = adapter;
 
