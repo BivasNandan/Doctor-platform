@@ -1,0 +1,458 @@
+// Carewell database schema (PostgreSQL on Neon).
+//
+// Design rules
+//  * Field and enum names deliberately match the API contract in docs/API_CONTRACT.md, so the
+//    server can return rows with little or no renaming and the React client needs no changes.
+//  * Enum members are lower-case on purpose: Prisma returns exactly what the API sends
+//    ("pending", "accepted", ...), so no upper/lower-case conversion layer is needed.
+//  * Values that can be derived are NOT stored (nextAvailable, availability buckets, the
+//    "booked" slot state, unread counts) so they can never drift out of sync.
+//  * Rules Prisma cannot express (partial unique indexes, CHECKs, overlap exclusion) live in the
+//    migration SQL. Always change the database with `prisma migrate`, never `prisma db push`,
+//    which would drop them.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────────────────────
+
+enum Role {
+  patient
+  doctor
+  admin
+}
+
+enum AccountStatus {
+  active
+  suspended
+  deactivated
+  deactivation_requested
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  rejected
+  suspended
+}
+
+enum PublicationStatus {
+  published
+  unpublished
+  inactive
+}
+
+enum FacilityType {
+  clinic
+  hospital
+}
+
+/// Doctor-controlled state. "booked" is derived from an accepted appointment, never stored.
+enum SlotStatus {
+  available
+  unavailable
+}
+
+enum AppointmentStatus {
+  pending
+  accepted
+  rejected
+  cancelled
+  completed
+}
+
+/// Who the visit is for, relative to the account holder who booked it.
+enum Relationship {
+  self
+  child
+  parent
+  spouse
+  sibling
+  other
+}
+
+enum ConversationKind {
+  patient_doctor
+  doctor_admin
+}
+
+enum DeactivationStatus {
+  open
+  approved
+  declined
+}
+
+// ── Identity ───────────────────────────────────────────────────────────────────────────
+
+model User {
+  id              String        @id @default(uuid()) @db.Uuid
+  /// Full display name (the UI has one "Full name" field).
+  name            String
+  /// Store lower-cased; the service layer normalises before every lookup.
+  email           String        @unique
+  phone           String?
+  passwordHash    String        @map("password_hash")
+  role            Role          @default(patient)
+  accountStatus   AccountStatus @default(active) @map("account_status")
+  /// Null until the emailed code is confirmed. API field `emailVerified` = (value !== null).
+  emailVerifiedAt DateTime?     @map("email_verified_at") @db.Timestamptz(3)
+  lastSeenAt      DateTime?     @map("last_seen_at") @db.Timestamptz(3)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  doctor               Doctor?
+  appointments         Appointment[]         @relation("PatientAppointments")
+  patientConversations Conversation[]        @relation("ConversationPatient")
+  messages             Message[]
+  sessions             Session[]
+  emailVerifications   EmailVerification[]
+  passwordResets       PasswordReset[]
+  notifications        Notification[]
+  supportRequests      SupportRequest[]
+  auditEntries         AuditLog[]
+  decidedDeactivations DeactivationRequest[] @relation("DeactivationDecider")
+
+  @@index([name])
+  @@map("users")
+}
+
+/// Hashed one-time codes for "verify your email" (never store the code itself).
+model EmailVerification {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("email_verifications")
+}
+
+/// Single-use "forgot password" links (store only a hash of the token).
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+/// Server-side login sessions (cookie session id, or refresh tokens if JWT is chosen).
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  userAgent  String?   @map("user_agent")
+  ipAddress  String?   @map("ip_address")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ── Reference data ─────────────────────────────────────────────────────────────────────
+
+model Specialty {
+  /// The slug itself (e.g. "cardiology"), exactly what the frontend already uses as the id.
+  id          String  @id
+  name        String  @unique
+  description String  @default("")
+  active      Boolean @default(true)
+
+  doctors Doctor[]
+
+  @@map("specialties")
+}
+
+/// Called "Facility" in the frontend; the API path is /clinics.
+model Clinic {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  type         FacilityType @default(clinic)
+  address      String
+  area         String
+  city         String
+  phone        String
+  openingHours String?      @map("opening_hours")
+  image        String?
+  latitude     Decimal?     @db.Decimal(9, 6)
+  longitude    Decimal?     @db.Decimal(9, 6)
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  doctors      DoctorClinic[]
+  appointments Appointment[]
+
+  @@index([city, area])
+  @@index([active])
+  @@map("clinics")
+}
+
+// ── Doctors ────────────────────────────────────────────────────────────────────────────
+
+/// Name, email, phone and account state live on the linked User.
+model Doctor {
+  id                    String             @id @default(uuid()) @db.Uuid
+  userId                String             @unique @map("user_id") @db.Uuid
+  /// One specialty per doctor, as the UI shows and filters by.
+  specialtyId           String             @map("specialty_id")
+  image                 String?
+  qualifications        String[]
+  experienceYears       Int                @default(0) @map("experience_years")
+  /// Default consultation fee in whole BDT (taka). Per-clinic overrides are on DoctorClinic.
+  fee                   Int
+  location              String
+  bio                   String?
+  verificationStatus    VerificationStatus @default(pending) @map("verification_status")
+  publicationStatus     PublicationStatus  @default(unpublished) @map("publication_status")
+  profileReviewRequired Boolean            @default(false) @map("profile_review_required")
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty            Specialty             @relation(fields: [specialtyId], references: [id], onDelete: Restrict)
+  clinics              DoctorClinic[]
+  slots                AvailabilitySlot[]
+  appointments         Appointment[]
+  conversations        Conversation[]
+  certificates         DoctorCertificate[]
+  deactivationRequests DeactivationRequest[]
+
+  @@index([specialtyId])
+  @@index([verificationStatus, publicationStatus])
+  @@map("doctors")
+}
+
+/// Which clinics a doctor practises at, with an optional per-clinic fee.
+model DoctorClinic {
+  doctorId String @map("doctor_id") @db.Uuid
+  clinicId String @map("clinic_id") @db.Uuid
+  /// Whole BDT. Null = use Doctor.fee. API field `feesByFacility`.
+  fee      Int?
+
+  doctor Doctor             @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  clinic Clinic             @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+  slots  AvailabilitySlot[]
+
+  @@id([doctorId, clinicId])
+  @@index([clinicId])
+  @@map("doctor_clinics")
+}
+
+/// Admin-reviewed evidence for verification (files live in object storage).
+model DoctorCertificate {
+  id         String   @id @default(uuid()) @db.Uuid
+  doctorId   String   @map("doctor_id") @db.Uuid
+  storageKey String   @map("storage_key")
+  fileName   String   @map("file_name")
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(3)
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId])
+  @@map("doctor_certificates")
+}
+
+model DeactivationRequest {
+  id          String             @id @default(uuid()) @db.Uuid
+  doctorId    String             @map("doctor_id") @db.Uuid
+  reason      String
+  status      DeactivationStatus @default(open)
+  decidedById String?            @map("decided_by_id") @db.Uuid
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  decidedAt   DateTime?          @map("decided_at") @db.Timestamptz(3)
+
+  doctor    Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  decidedBy User?  @relation("DeactivationDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([doctorId, status])
+  @@map("deactivation_requests")
+}
+
+// ── Scheduling & booking ───────────────────────────────────────────────────────────────
+
+/// One bookable visit window at one clinic. Date and times are the clinic's local time
+/// (Asia/Dhaka, no daylight saving), exactly as the UI shows and edits them.
+model AvailabilitySlot {
+  id        String     @id @default(uuid()) @db.Uuid
+  doctorId  String     @map("doctor_id") @db.Uuid
+  clinicId  String     @map("clinic_id") @db.Uuid
+  date      DateTime   @db.Date
+  startTime DateTime   @map("start_time") @db.Time(0)
+  endTime   DateTime   @map("end_time") @db.Time(0)
+  status    SlotStatus @default(available)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  doctor       Doctor        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  /// A slot can only exist where the doctor actually practises.
+  doctorClinic DoctorClinic  @relation(fields: [doctorId, clinicId], references: [doctorId, clinicId], onDelete: NoAction)
+  appointments Appointment[]
+
+  /// Target of Appointment's composite foreign key (keeps slot, doctor and clinic consistent).
+  @@unique([id, doctorId, clinicId])
+  @@unique([doctorId, clinicId, date, startTime])
+  @@index([doctorId, date])
+  @@index([clinicId, date])
+  @@map("availability_slots")
+}
+
+/// A patient's request for a slot. Date and time come from the slot, never duplicated here.
+model Appointment {
+  id           String            @id @default(uuid()) @db.Uuid
+  /// The signed-in account that booked (booking requires a verified account).
+  patientId    String            @map("patient_id") @db.Uuid
+  slotId       String            @map("slot_id") @db.Uuid
+  /// doctorId and clinicId repeat the slot's values so lists can filter without a join;
+  /// the composite foreign key below guarantees they always match the slot.
+  doctorId     String            @map("doctor_id") @db.Uuid
+  clinicId     String            @map("clinic_id") @db.Uuid
+  relationship Relationship      @default(self)
+  /// Who the visit is for (may be a family member) and how to reach the account holder.
+  patientName  String            @map("patient_name")
+  phone        String
+  email        String
+  reason       String
+  status       AppointmentStatus @default(pending)
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  patient User             @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Restrict)
+  slot    AvailabilitySlot @relation(fields: [slotId, doctorId, clinicId], references: [id, doctorId, clinicId], onDelete: Restrict)
+  doctor  Doctor           @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  clinic  Clinic           @relation(fields: [clinicId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, status])
+  @@index([doctorId, status])
+  @@index([slotId, status])
+  @@map("appointments")
+}
+
+// ── Messaging ──────────────────────────────────────────────────────────────────────────
+
+/// One thread per patient and doctor (opened when their first request is accepted), plus one
+/// doctor-to-administration thread per doctor (patientId is null).
+model Conversation {
+  id        String           @id @default(uuid()) @db.Uuid
+  kind      ConversationKind @default(patient_doctor)
+  doctorId  String           @map("doctor_id") @db.Uuid
+  patientId String?          @map("patient_id") @db.Uuid
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  doctor   Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient  User?     @relation("ConversationPatient", fields: [patientId], references: [id], onDelete: Restrict)
+  messages Message[]
+
+  @@unique([doctorId, patientId])
+  @@index([patientId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  senderId       String    @map("sender_id") @db.Uuid
+  /// Empty for attachment-only messages.
+  body           String    @default("")
+  readAt         DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  conversation Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  attachments  MessageAttachment[]
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id         String   @id @default(uuid()) @db.Uuid
+  messageId  String   @map("message_id") @db.Uuid
+  /// Key in the private bucket. Serve downloads through short-lived signed URLs, never stored URLs.
+  storageKey String   @map("storage_key")
+  fileName   String   @map("file_name")
+  fileType   String   @map("file_type")
+  fileSize   Int      @map("file_size")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("message_attachments")
+}
+
+// ── Support & governance ───────────────────────────────────────────────────────────────
+
+model SupportRequest {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  email     String?
+  message   String
+  status    String   @default("received")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@map("support_requests")
+}
+
+/// Append-only record of admin decisions (who did what, before and after).
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+/// One line in a user's notification (bell) menu. groupKey merges repeated events about the same thing
+/// (for example "message:<conversationId>") into one unread row.
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  /// appointment | message | doctor | account | support
+  kind      String
+  title     String
+  body      String    @default("")
+  /// In-app route to open when the notification is clicked.
+  link      String?
+  groupKey  String?   @map("group_key")
+  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
