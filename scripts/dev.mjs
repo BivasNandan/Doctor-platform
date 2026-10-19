@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Starts the API (server/) and the website (client/) together:   npm run dev
 // Output is labelled [api] and [web]. Press Ctrl+C once to stop both.
+// The website opens in your browser by itself when it is ready (use `npm run dev -- --no-open` to skip that).
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -20,6 +21,24 @@ for (const folder of ["server", "client"]) {
 }
 
 const children = [];
+const noOpen = process.argv.includes("--no-open");
+let opened = false;
+
+/** Opens the website in the default browser, once, when Vite reports its address. */
+function openBrowser(url) {
+  if (opened || noOpen) return;
+  opened = true;
+  const [command, args] =
+    process.platform === "win32"
+      ? ["cmd", ["/c", "start", "", url]]
+      : process.platform === "darwin"
+        ? ["open", [url]]
+        : ["xdg-open", [url]];
+  spawn(command, args, { stdio: "ignore", detached: true }).on("error", () => {
+    console.log(`Open ${url} in your browser.`);
+  });
+}
+
 function start(label, color, folder) {
   const child = spawn("npm", ["run", "dev"], {
     cwd: resolve(root, folder),
@@ -29,7 +48,12 @@ function start(label, color, folder) {
   });
   const prefix = `\x1b[${color}m[${label}]\x1b[0m `;
   for (const stream of [child.stdout, child.stderr])
-    createInterface({ input: stream }).on("line", (line) => console.log(prefix + line));
+    createInterface({ input: stream }).on("line", (line) => {
+      console.log(prefix + line);
+      // Vite prints "Local:   http://localhost:5173/Doctor-platform/" when it is ready.
+      const address = label === "web" && line.replace(/\x1b\[[0-9;]*m/g, "").match(/Local:\s+(https?:\/\/\S+)/);
+      if (address) openBrowser(address[1]);
+    });
   child.on("exit", (code) => {
     console.log(`${prefix}stopped (exit code ${code})`);
     stop();
