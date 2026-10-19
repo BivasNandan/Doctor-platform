@@ -1,7 +1,7 @@
 import { ApiError } from "../http/httpClient.js";
 import { ROLES } from "../../constants/roles.js";
 import { isAccountRestricted } from "../../constants/statuses.js";
-import { DEMO_VERIFICATION_CODE } from "../../constants/demo.js";
+import { DEMO_RESET_TOKEN, DEMO_VERIFICATION_CODE } from "../../constants/demo.js";
 import { isValidEmail, isValidPhone } from "../../utils/validation.js";
 import { conflict, DEMO_PATIENT, db, findDoctor, invalid, nextId, reply, requireRole } from "./db.js";
 
@@ -125,6 +125,23 @@ export const authService = {
   async resendVerification() {
     requireRole(ROLES.PATIENT);
     return reply({ sent: true });
+  },
+
+  /** Same answer for every well-formed email, like the real endpoint should give. */
+  async requestPasswordReset(email) {
+    if (!isValidEmail(email ?? "")) throw invalid("Enter a valid email address.");
+    return reply({ sent: true });
+  },
+
+  /** Demo accepts the single token in `constants/demo.js`. The password is never stored. */
+  async resetPassword({ token, password }) {
+    if (token !== DEMO_RESET_TOKEN)
+      throw new ApiError("This reset link is invalid or has expired. Request a new one.", {
+        status: 410,
+        code: "RESET_TOKEN_INVALID",
+      });
+    if ((password ?? "").length < 8) throw invalid("Use at least 8 characters.");
+    return reply({ reset: true });
   },
 
   async updateProfile({ name, phone }) {

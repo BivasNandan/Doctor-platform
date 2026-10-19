@@ -6,6 +6,8 @@ import AppShell from "../components/layout/AppShell.jsx";
 import RequireRole from "../features/auth/RequireRole.jsx";
 import DoctorRegisterPage from "../features/auth/pages/DoctorRegisterPage.jsx";
 import LoginPage from "../features/auth/pages/LoginPage.jsx";
+import ForgotPasswordPage from "../features/auth/pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "../features/auth/pages/ResetPasswordPage.jsx";
 import SignUpPage from "../features/auth/pages/SignUpPage.jsx";
 import VerifyEmailPage from "../features/auth/pages/VerifyEmailPage.jsx";
 import ProfilePage from "../features/account/pages/ProfilePage.jsx";
@@ -46,6 +48,8 @@ export default function App() {
         <Route path={PATHS.login} element={<LoginPage portal={ROLES.PATIENT} />} />
         <Route path={PATHS.signup} element={<SignUpPage />} />
         <Route path={PATHS.verifyEmail} element={<VerifyEmailPage />} />
+        <Route path={PATHS.forgotPassword} element={<ForgotPasswordPage />} />
+        <Route path={PATHS.resetPassword} element={<ResetPasswordPage />} />
         <Route element={<RequireRole role={ROLES.PATIENT} />}>
           <Route path={PATHS.appointments} element={<AppointmentsPage />} />
           <Route path={PATHS.profile} element={<ProfilePage />} />

@@ -23,6 +23,15 @@ export const authService = {
   /** Emails a fresh verification code. */
   resendVerification: () => http.post("/auth/verify-email/resend"),
 
+  /**
+   * Emails a password-reset link. Always resolves the same way, whether or not the
+   * email belongs to an account, so the form cannot be used to discover accounts.
+   */
+  requestPasswordReset: (email) => http.post("/auth/forgot-password", { email }),
+
+  /** Sets a new password using the token from the emailed link. */
+  resetPassword: ({ token, password }) => http.post("/auth/reset-password", { token, password }),
+
   /** Updates the signed-in patient's name and phone. Resolves `{ user }`. */
   updateProfile: (input) => http.patch("/auth/me", input),
 

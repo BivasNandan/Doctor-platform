@@ -10,6 +10,8 @@ export const PATHS = Object.freeze({
   login: "/login",
   signup: "/signup",
   verifyEmail: "/verify-email",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   profile: "/profile",
 
   doctorLogin: "/doctor/login",

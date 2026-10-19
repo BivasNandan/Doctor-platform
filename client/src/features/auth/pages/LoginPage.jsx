@@ -73,11 +73,13 @@ export default function LoginPage({ portal }) {
     }
   };
 
-  const prompt = location.state?.resumeBooking
-    ? "Sign in or create an account to book your appointment. We’ll bring you straight back to this doctor."
-    : location.state?.reason === "protected"
-      ? "Please sign in to continue."
-      : "";
+  const prompt =
+    location.state?.notice ??
+    (location.state?.resumeBooking
+      ? "Sign in or create an account to book your appointment. We’ll bring you straight back to this doctor."
+      : location.state?.reason === "protected"
+        ? "Please sign in to continue."
+        : "");
 
   return (
     <>
@@ -101,6 +103,11 @@ export default function LoginPage({ portal }) {
           </Field>
         </div>
         <Notice error>{error}</Notice>
+        <p className="form-link">
+          <Link className="text-link" to={PATHS.forgotPassword}>
+            Forgot your password?
+          </Link>
+        </p>
         <div className="form-actions">
           {portal === ROLES.PATIENT && (
             <>

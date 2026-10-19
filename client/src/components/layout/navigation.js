@@ -30,6 +30,8 @@ const ROUTE_TITLES = [
   [PATHS.login, "Sign in"],
   [PATHS.signup, "Create account"],
   [PATHS.verifyEmail, "Verify email"],
+  [PATHS.forgotPassword, "Forgot password"],
+  [PATHS.resetPassword, "Reset password"],
   [PATHS.profile, "Your profile"],
   [PATHS.doctorLogin, "Doctor sign in"],
   [PATHS.doctorRegister, "Doctor registration"],

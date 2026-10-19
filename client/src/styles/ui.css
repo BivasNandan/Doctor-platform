@@ -90,6 +90,10 @@
   background: var(--color-selected-bg);
 }
 
+.form-link {
+  margin: 10px 0 0;
+}
+
 /* Loading and status --------------------------------------------------- */
 .page-loader {
   display: flex;
