@@ -176,6 +176,8 @@ export const PATHS = Object.freeze({
   adminAppointments: "/admin/appointments",
   adminSpecialties: "/admin/specialties",
   adminAvailability: "/admin/availability",
+  adminSupport: "/admin/support",
+  adminDeactivationRequests: "/admin/deactivation-requests",
 });
 
 export const doctorProfilePath = (id) => `/doctors/${encodeURIComponent(id)}`;

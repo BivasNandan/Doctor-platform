@@ -99,6 +99,7 @@ function createDb() {
       },
     ],
     supportRequests: [],
+    deactivationRequests: [],
     notifications: [
       {
         role: "patient",
@@ -330,6 +331,7 @@ export const supportService = {
       message: message.trim(),
       email: email ?? "",
       status: "received",
+      createdAt: new Date().toISOString(),
       simulated: true,
     };
     db.supportRequests.push(request);
@@ -701,6 +703,17 @@ export const doctorPortalService = {
     const doctor = ownDoctor();
     if (!reason?.trim()) throw invalid("Provide a reason for the deactivation request.");
     doctor.accountStatus = ACCOUNT_STATUS.DEACTIVATION_REQUESTED;
+    const request = {
+      id: nextId("DEMO-DEA"),
+      doctorId: doctor.id,
+      doctorName: doctor.name,
+      doctorEmail: doctor.email ?? "",
+      reason: reason.trim(),
+      status: "open",
+      createdAt: new Date().toISOString(),
+      simulated: true,
+    };
+    db.deactivationRequests.unshift(request);
     pushNotification("admin", {
       kind: "doctor",
       title: "Deactivation request",
@@ -1120,5 +1133,51 @@ export const adminService = {
       link: "/doctor/dashboard",
     });
     return reply(hydrate(appointment));
+  },
+
+  // Support and account review ----------------------------------------
+  async listSupportRequests(status) {
+    admin();
+    return reply(db.supportRequests.filter((item) => !status || item.status === status));
+  },
+
+  async updateSupportRequest(id, status) {
+    admin();
+    if (!["received", "in_progress", "resolved"].includes(status))
+      throw invalid("Unsupported support request status.");
+    const request = db.supportRequests.find((item) => item.id === id);
+    if (!request) throw notFound("This support request");
+    request.status = status;
+    return reply(request);
+  },
+
+  async replyToSupportRequest(id, { message, resolve = true }) {
+    admin();
+    const request = db.supportRequests.find((item) => item.id === id);
+    if (!request) throw notFound("This support request");
+    if (!request.email) throw invalid("This person did not leave an email address to reply to.");
+    if (!message?.trim()) throw invalid("Write a reply.");
+    request.status = resolve ? "resolved" : "in_progress";
+    request.lastReply = message.trim();
+    return reply(request);
+  },
+
+  async listDeactivationRequests(status = "open") {
+    admin();
+    return reply(db.deactivationRequests.filter((item) => item.status === status));
+  },
+
+  async decideDeactivationRequest(id, decision) {
+    admin();
+    if (!["approve", "decline"].includes(decision)) throw invalid("Choose approve or decline.");
+    const request = db.deactivationRequests.find((item) => item.id === id);
+    if (!request) throw notFound("This deactivation request");
+    if (request.status !== "open") throw conflict("This request has already been decided.", "ALREADY_DECIDED");
+    request.status = decision === "approve" ? "approved" : "declined";
+    request.decidedAt = new Date().toISOString();
+    const doctor = requireDoctor(request.doctorId);
+    doctor.accountStatus = decision === "approve" ? ACCOUNT_STATUS.DEACTIVATED : ACCOUNT_STATUS.ACTIVE;
+    if (decision === "approve") doctor.publicationStatus = PUBLICATION_STATUS.INACTIVE;
+    return reply(request);
   },
 };

@@ -2118,6 +2118,80 @@ td {
 .verification-card > .pill {
   align-self: start;
 }
+.review-request-card,
+.support-request-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+.review-request-main,
+.support-request-main {
+  min-width: 0;
+}
+.review-request-heading,
+.support-request-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.review-request-heading h3 {
+  margin: 4px 0 2px;
+}
+.review-request-email,
+.support-request-contact a,
+.support-request-contact span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.review-request-reason,
+.support-request-message {
+  margin: 10px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.review-request-actions,
+.support-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.support-request-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+}
+.support-request-contact strong {
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+.support-reply-form {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  width: min(100%, 440px);
+  margin-top: 8px;
+}
+@media (max-width: 700px) {
+  .review-request-card,
+  .support-request-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .review-request-actions,
+  .support-request-actions {
+    justify-content: flex-start;
+  }
+  .support-reply-form {
+    width: 100%;
+  }
+}
 .specialty-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

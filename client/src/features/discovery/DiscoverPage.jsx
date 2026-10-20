@@ -360,11 +360,7 @@ function Testimonial() {
 
 // ─── content ───────────────────────────────────────────────────────────────────────────────
 
-/**
- * Static marketing copy and options for the discovery screens.
- * The stats below are placeholders: replace them with a public stats endpoint
- * (e.g. GET /stats/public) before launch rather than hard-coding real claims.
- */
+/** Static marketing copy and options for the discovery screens. */
 
 /** External stock imagery. Host these in /public/images for production. */
 export const HERO_IMAGE =
@@ -377,9 +373,9 @@ export const HERO_AVATARS = [
 ];
 
 export const TRUST_STATS = [
-  { value: "250", suffix: "+", label: "verified specialists" },
-  { value: "18", suffix: "k", label: "appointments made" },
-  { value: "4.9", suffix: "★", label: "patient experience" },
+  { value: "Search", suffix: "", label: "by specialty and area" },
+  { value: "Compare", suffix: "", label: "fees and clinic locations" },
+  { value: "Request", suffix: "", label: "an appointment time" },
 ];
 
 /** Specialty ids offered as one-click shortcuts under the search box. */

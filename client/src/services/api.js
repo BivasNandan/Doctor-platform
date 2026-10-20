@@ -179,4 +179,15 @@ export const adminService = {
   // Appointments
   listAppointments: () => http.get("/admin/appointments"),
   updateAppointmentStatus: (id, status) => http.patch(`/admin/appointments/${segment(id)}`, { status }),
+
+  // Support and account review
+  listSupportRequests: (status) => http.get("/admin/support-requests", { query: { status } }),
+  updateSupportRequest: (id, status) =>
+    http.patch(`/admin/support-requests/${segment(id)}`, { status }),
+  replyToSupportRequest: (id, input) =>
+    http.post(`/admin/support-requests/${segment(id)}/reply`, input),
+  listDeactivationRequests: (status = "open") =>
+    http.get("/admin/deactivation-requests", { query: { status } }),
+  decideDeactivationRequest: (id, decision) =>
+    http.post(`/admin/deactivation-requests/${segment(id)}/${decision}`),
 };

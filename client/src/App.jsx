@@ -41,6 +41,8 @@ const AdminAvailabilityPage = lazy(() =>
     default: module.AdminAvailabilityPage,
   })),
 );
+const SupportRequestsPage = lazy(() => import("./features/admin/SupportRequestsPage.jsx"));
+const DeactivationRequestsPage = lazy(() => import("./features/admin/DeactivationRequestsPage.jsx"));
 
 /** The route table. Add new screens here. */
 export default function App() {
@@ -88,6 +90,8 @@ export default function App() {
           <Route path={PATHS.adminAppointments} element={<AppointmentManagementPage />} />
           <Route path={PATHS.adminSpecialties} element={<SpecialtiesPage />} />
           <Route path={PATHS.adminAvailability} element={<AdminAvailabilityPage />} />
+          <Route path={PATHS.adminSupport} element={<SupportRequestsPage />} />
+          <Route path={PATHS.adminDeactivationRequests} element={<DeactivationRequestsPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

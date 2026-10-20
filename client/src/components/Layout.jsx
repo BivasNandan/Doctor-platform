@@ -677,6 +677,8 @@ const ROUTE_TITLES = [
   [PATHS.adminAppointments, "Appointment management"],
   [PATHS.adminSpecialties, "Specialties"],
   [PATHS.adminAvailability, "Availability"],
+  [PATHS.adminSupport, "Support requests"],
+  [PATHS.adminDeactivationRequests, "Deactivation review"],
 ];
 
 export function routeTitle(pathname) {
@@ -729,6 +731,8 @@ const ADMIN_GROUP = {
     { to: PATHS.adminAppointments, label: "Appointment management", icon: CalendarDays },
     { to: PATHS.adminSpecialties, label: "Specialties", icon: ListFilter },
     { to: PATHS.adminAvailability, label: "Availability", icon: Clock3 },
+    { to: PATHS.adminSupport, label: "Support requests", icon: LifeBuoy },
+    { to: PATHS.adminDeactivationRequests, label: "Deactivation review", icon: UserRound },
   ],
 };
 
