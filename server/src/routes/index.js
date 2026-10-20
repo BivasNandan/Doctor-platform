@@ -1,14 +1,14 @@
 import { accountsRouter } from "./accounts.js";
 import { adminRouter } from "./admin.js";
 import { adminReviewRouter } from "./adminReview.js";
-import { messagingRouter } from "./messaging.js";
-import { notificationsRouter } from "./notifications.js";
-import { onboardingRouter } from "./onboarding.js";
-import { supportRouter } from "./support.js";
 import { authRouter } from "./auth.js";
 import { bookingRouter } from "./booking.js";
 import { catalogRouter } from "./catalog.js";
 import { doctorRouter } from "./doctor.js";
+import { messagingRouter } from "./messaging.js";
+import { notificationsRouter } from "./notifications.js";
+import { onboardingRouter } from "./onboarding.js";
+import { supportRouter } from "./support.js";
 
 /**
  * Every router of the API, mounted under /api/v1. To add a feature, create routes/<name>.js that

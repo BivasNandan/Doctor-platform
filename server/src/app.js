@@ -2,12 +2,12 @@ import cors from "cors";
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
-import { authenticate, checkOrigin } from "./auth.js";
 import { env } from "./config/env.js";
-import { checkDatabase } from "./db/pool.js";
-import { errorHandler } from "./http.js";
+import { checkDatabase } from "./config/pool.js";
+import { authenticate, checkOrigin } from "./middleware/authenticate.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 import { mountRoutes } from "./routes/index.js";
-import { checkStorage } from "./storage/objectStore.js";
+import { checkStorage } from "./services/storage.js";
 
 export const app = express();
 

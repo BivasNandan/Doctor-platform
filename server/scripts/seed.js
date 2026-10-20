@@ -1,11 +1,11 @@
+import { prisma } from "../src/config/prisma.js";
+import { hashPassword } from "../src/services/auth.js";
+
 // Creates the first administrator and the reference data the app needs to be usable.
 // Safe to run more than once: it updates what exists and creates what is missing.
 //
 //   SEED_ADMIN_EMAIL     (default admin@carewell.test)
 //   SEED_ADMIN_PASSWORD  (required, at least 10 characters; set it in the root .env.local)
-import "../src/config/env.js";
-import { hashPassword } from "../src/auth.js";
-import { prisma } from "../src/config/prisma.js";
 
 const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@carewell.test").trim().toLowerCase();
 const password = process.env.SEED_ADMIN_PASSWORD ?? "";
@@ -62,7 +62,13 @@ try {
   const admin = await prisma.user.upsert({
     where: { email },
     update: { passwordHash, role: "admin", accountStatus: "active", emailVerifiedAt: new Date() },
-    create: { name: "Carewell administrator", email, passwordHash, role: "admin", emailVerifiedAt: new Date() },
+    create: {
+      name: "Carewell administrator",
+      email,
+      passwordHash,
+      role: "admin",
+      emailVerifiedAt: new Date(),
+    },
   });
 
   for (const specialty of specialties)
@@ -78,7 +84,9 @@ try {
   }
 
   console.log(`Administrator ready: ${admin.email}`);
-  console.log(`Specialties: ${specialties.length} ensured. Clinics: ${createdClinics} created, ${clinics.length - createdClinics} already existed.`);
+  console.log(
+    `Specialties: ${specialties.length} ensured. Clinics: ${createdClinics} created, ${clinics.length - createdClinics} already existed.`,
+  );
 } catch (error) {
   console.error("Seeding failed:", error.message);
   process.exitCode = 1;

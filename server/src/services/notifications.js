@@ -1,4 +1,4 @@
-import { prisma } from "./config/prisma.js";
+import { prisma } from "../config/prisma.js";
 
 /**
  * In-app notifications: one line in somebody's bell menu. Routes call `notify` after something
@@ -19,7 +19,9 @@ export const LINKS = {
 
 const PREVIEW = 90;
 export const preview = (text) => {
-  const clean = String(text ?? "").replace(/\s+/g, " ").trim();
+  const clean = String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
   return clean.length > PREVIEW ? `${clean.slice(0, PREVIEW - 1)}…` : clean;
 };
 
@@ -35,9 +37,15 @@ export async function notify(userIds, { kind, title, body = "", link, groupKey }
   try {
     for (const userId of ids) {
       if (groupKey) {
-        const existing = await prisma.notification.findFirst({ where: { userId, groupKey, readAt: null }, select: { id: true } });
+        const existing = await prisma.notification.findFirst({
+          where: { userId, groupKey, readAt: null },
+          select: { id: true },
+        });
         if (existing) {
-          await prisma.notification.update({ where: { id: existing.id }, data: { title, body, link, createdAt: new Date() } });
+          await prisma.notification.update({
+            where: { id: existing.id },
+            data: { title, body, link, createdAt: new Date() },
+          });
           continue;
         }
       }
@@ -51,8 +59,14 @@ export async function notify(userIds, { kind, title, body = "", link, groupKey }
 /** Notifies every active administrator. */
 export async function notifyAdmins(content) {
   try {
-    const admins = await prisma.user.findMany({ where: { role: "admin", accountStatus: "active" }, select: { id: true } });
-    await notify(admins.map((admin) => admin.id), content);
+    const admins = await prisma.user.findMany({
+      where: { role: "admin", accountStatus: "active" },
+      select: { id: true },
+    });
+    await notify(
+      admins.map((admin) => admin.id),
+      content,
+    );
   } catch (error) {
     console.error(`[notifications] could not notify administrators: ${error.message}`);
   }
@@ -70,5 +84,8 @@ export async function notifyDoctor(doctorId, content) {
 
 /** Marks the user's unread notifications with this group key as read (they opened the chat). */
 export async function markGroupRead(userId, groupKey) {
-  await prisma.notification.updateMany({ where: { userId, groupKey, readAt: null }, data: { readAt: new Date() } });
+  await prisma.notification.updateMany({
+    where: { userId, groupKey, readAt: null },
+    data: { readAt: new Date() },
+  });
 }

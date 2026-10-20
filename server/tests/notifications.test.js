@@ -31,7 +31,15 @@ beforeEach(() => ctx.resetRateLimits());
 async function booked(extra = {}) {
   const doctor = await people.createDoctor(clinic);
   const patient = await people.createPatient();
-  const slot = ok(await doctor.client.post("/doctor/availability", { facilityId: clinic.id, date: day(2), startTime: "10:00", endTime: "10:30" }), 201);
+  const slot = ok(
+    await doctor.client.post("/doctor/availability", {
+      facilityId: clinic.id,
+      date: day(2),
+      startTime: "10:00",
+      endTime: "10:30",
+    }),
+    201,
+  );
   const request = ok(
     await patient.client.post("/appointment-requests", {
       doctorId: doctor.id,
@@ -74,7 +82,13 @@ describe("the notification list", () => {
 
   it("marks one notification, then all of them, as read", async () => {
     const { doctor, request } = await booked();
-    await ctx.prisma.notification.create({ data: { userId: (await ctx.prisma.doctor.findUnique({ where: { id: doctor.id } })).userId, kind: "account", title: "Second one" } });
+    await ctx.prisma.notification.create({
+      data: {
+        userId: (await ctx.prisma.doctor.findUnique({ where: { id: doctor.id } })).userId,
+        kind: "account",
+        title: "Second one",
+      },
+    });
     const before = ok(await doctor.client.get("/notifications"));
     assert.equal(before.unreadCount, 2);
 
@@ -92,7 +106,10 @@ describe("the notification list", () => {
     const mine = (await inbox(patient))[0];
     fails(await doctor.client.post(`/notifications/${mine.id}/read`), 404, "NOT_FOUND");
     fails(await patient.client.post("/notifications/not-an-id/read"), 404, "NOT_FOUND");
-    assert.equal((await inbox(doctor)).some((item) => item.id === mine.id), false);
+    assert.equal(
+      (await inbox(doctor)).some((item) => item.id === mine.id),
+      false,
+    );
   });
 
   it("validates the limit", async () => {
@@ -119,7 +136,10 @@ describe("appointment updates", () => {
     assert.match(accepted.body, /accepted your request/);
     assert.equal(accepted.link, "/messages");
     // The doctor did it themselves, so they are not told about their own action.
-    assert.equal((await titles(doctor)).some((title) => title.startsWith("Appointment accepted")), false);
+    assert.equal(
+      (await titles(doctor)).some((title) => title.startsWith("Appointment accepted")),
+      false,
+    );
   });
 
   it("tells the patient when the doctor rejects", async () => {
@@ -132,14 +152,20 @@ describe("appointment updates", () => {
     const { doctor, patient, request } = await booked();
     ok(await patient.client.patch(`/appointment-requests/${request.id}`, { status: "cancelled" }));
     assert.ok(await find(doctor, "Appointment cancelled by the patient"));
-    assert.equal((await titles(patient)).some((title) => title.startsWith("Appointment cancelled")), false);
+    assert.equal(
+      (await titles(patient)).some((title) => title.startsWith("Appointment cancelled")),
+      false,
+    );
   });
 
   it("tells both people when an administrator changes a request", async () => {
     const { doctor, patient, request } = await booked();
     ok(await admins[0].client.patch(`/admin/appointments/${request.id}`, { status: "accepted" }));
     assert.match((await find(patient, "Appointment accepted")).body, /accepted/);
-    assert.match((await find(doctor, "Appointment accepted by the administration")).body, /by the administration/);
+    assert.match(
+      (await find(doctor, "Appointment accepted by the administration")).body,
+      /by the administration/,
+    );
     ok(await admins[0].client.patch(`/admin/appointments/${request.id}`, { status: "completed" }));
     assert.ok(await find(patient, "Appointment completed"));
     assert.ok(await find(doctor, "Appointment completed"));
@@ -171,7 +197,10 @@ describe("messages", () => {
     ok(await doctor.client.get(`/conversations/${thread.id}/messages`));
     assert.equal((await find(doctor, `New message from ${patient.name}`)).read, true);
 
-    ok(await doctor.client.post(`/conversations/${thread.id}/messages`, { body: "Hello, how can I help?" }), 201);
+    ok(
+      await doctor.client.post(`/conversations/${thread.id}/messages`, { body: "Hello, how can I help?" }),
+      201,
+    );
     const reply = await find(patient, `New message from ${doctor.name}`);
     assert.equal(reply.body, "Hello, how can I help?");
     assert.equal(reply.read, false);
@@ -181,15 +210,29 @@ describe("messages", () => {
     const { doctor, patient, request } = await booked();
     ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }));
     const [thread] = ok(await patient.client.get("/conversations"));
-    ok(await upload(ctx, patient.client, `/conversations/${thread.id}/attachments`, { name: "blood test.pdf" }), 201);
-    assert.equal((await find(doctor, `New message from ${patient.name}`)).body, "Sent a file: blood test.pdf");
+    ok(
+      await upload(ctx, patient.client, `/conversations/${thread.id}/attachments`, {
+        name: "blood test.pdf",
+      }),
+      201,
+    );
+    assert.equal(
+      (await find(doctor, `New message from ${patient.name}`)).body,
+      "Sent a file: blood test.pdf",
+    );
   });
 
   it("notifies every administrator about a doctor's message, and the doctor about the reply", async () => {
     const doctor = await people.createDoctor(clinic);
-    const thread = ok(await doctor.client.get("/conversations")).find((item) => item.participantRole === "admin");
-    ok(await doctor.client.post(`/conversations/${thread.id}/messages`, { body: "Please look at my profile" }), 201);
-    for (const admin of admins) assert.equal((await find(admin, `New message from ${doctor.name}`)).body, "Please look at my profile");
+    const thread = ok(await doctor.client.get("/conversations")).find(
+      (item) => item.participantRole === "admin",
+    );
+    ok(
+      await doctor.client.post(`/conversations/${thread.id}/messages`, { body: "Please look at my profile" }),
+      201,
+    );
+    for (const admin of admins)
+      assert.equal((await find(admin, `New message from ${doctor.name}`)).body, "Please look at my profile");
 
     ok(await admins[1].client.post(`/conversations/${thread.id}/messages`, { body: "On it" }), 201);
     assert.equal((await find(doctor, "New message from Carewell administration")).body, "On it");
@@ -213,11 +256,14 @@ describe("doctor onboarding", () => {
   it("tells the administrators about a registration and each certificate", async () => {
     const client = ctx.client();
     ok(await client.post("/auth/doctor/register", registration("notify.me@test.local")), 201);
-    for (const admin of admins) assert.match((await find(admin, "New doctor awaiting verification")).body, /Dr\. Notify Me registered/);
+    for (const admin of admins)
+      assert.match((await find(admin, "New doctor awaiting verification")).body, /Dr\. Notify Me registered/);
 
     ok(await upload(ctx, client, "/doctor/certificates", { name: "degree.pdf" }), 201);
     ok(await upload(ctx, client, "/doctor/certificates", { name: "licence.pdf" }), 201);
-    const uploads = (await inbox(admins[0])).filter((item) => item.title === "A doctor uploaded a certificate");
+    const uploads = (await inbox(admins[0])).filter(
+      (item) => item.title === "A doctor uploaded a certificate",
+    );
     assert.equal(uploads.length >= 1, true);
   });
 
@@ -239,14 +285,31 @@ describe("doctor onboarding", () => {
     const doctor = await people.createDoctor(clinic);
     ok(
       await admins[0].client.patch(`/admin/doctors/${doctor.id}`, {
-        name: "Dr. Renamed", specialtyId: "cardiology", qualifications: ["MBBS"], experienceYears: 6, fee: 900, location: "Banani", facilityIds: [clinic.id],
+        name: "Dr. Renamed",
+        specialtyId: "cardiology",
+        qualifications: ["MBBS"],
+        experienceYears: 6,
+        fee: 900,
+        location: "Banani",
+        facilityIds: [clinic.id],
       }),
     );
     assert.ok(await find(doctor, "Your profile was updated"));
-    const slot = ok(await admins[0].client.post("/admin/availability", { doctorId: doctor.id, facilityId: clinic.id, date: day(3), startTime: "09:00", endTime: "09:30" }), 201);
+    const slot = ok(
+      await admins[0].client.post("/admin/availability", {
+        doctorId: doctor.id,
+        facilityId: clinic.id,
+        date: day(3),
+        startTime: "09:00",
+        endTime: "09:30",
+      }),
+      201,
+    );
     ok(await admins[0].client.patch(`/admin/availability/${slot.id}`, { status: "unavailable" }));
     assert.equal((await admins[0].client.delete(`/admin/availability/${slot.id}`)).status, 204);
-    const schedule = (await inbox(doctor)).filter((item) => item.title === "Your schedule was changed by the administration");
+    const schedule = (await inbox(doctor)).filter(
+      (item) => item.title === "Your schedule was changed by the administration",
+    );
     assert.equal(schedule.length, 1); // three changes, one unread line
   });
 
@@ -254,7 +317,13 @@ describe("doctor onboarding", () => {
     const doctor = await people.createDoctor(clinic);
     ok(
       await doctor.client.patch("/doctor/profile", {
-        name: "Dr. Number Review", specialtyId: "neurology", qualifications: ["MBBS", "FCPS"], experienceYears: 5, fee: 1000, location: "Banani", facilityIds: [clinic.id],
+        name: "Dr. Number Review",
+        specialtyId: "neurology",
+        qualifications: ["MBBS", "FCPS"],
+        experienceYears: 5,
+        fee: 1000,
+        location: "Banani",
+        facilityIds: [clinic.id],
       }),
     );
     for (const admin of admins) {
@@ -265,17 +334,33 @@ describe("doctor onboarding", () => {
 
   it("handles deactivation requests in both directions", async () => {
     const leaving = await people.createDoctor(clinic);
-    ok(await leaving.client.post("/doctor/account/deactivation-requests", { reason: "I am moving abroad" }), 201);
+    ok(
+      await leaving.client.post("/doctor/account/deactivation-requests", { reason: "I am moving abroad" }),
+      201,
+    );
     assert.match((await find(admins[0], "Deactivation request")).body, /moving abroad/);
 
     const staying = await people.createDoctor(clinic);
-    ok(await staying.client.post("/doctor/account/deactivation-requests", { reason: "Taking a long break" }), 201);
+    ok(
+      await staying.client.post("/doctor/account/deactivation-requests", { reason: "Taking a long break" }),
+      201,
+    );
     const requests = ok(await admins[0].client.get("/admin/deactivation-requests"));
-    ok(await admins[0].client.post(`/admin/deactivation-requests/${requests.find((item) => item.doctorId === staying.id).id}/decline`));
+    ok(
+      await admins[0].client.post(
+        `/admin/deactivation-requests/${requests.find((item) => item.doctorId === staying.id).id}/decline`,
+      ),
+    );
     assert.ok(await find(staying, "Deactivation request declined"));
 
-    ok(await admins[0].client.post(`/admin/deactivation-requests/${requests.find((item) => item.doctorId === leaving.id).id}/approve`));
-    const row = await ctx.prisma.notification.findFirst({ where: { userId: leaving.userId, title: "Your account was deactivated" } });
+    ok(
+      await admins[0].client.post(
+        `/admin/deactivation-requests/${requests.find((item) => item.doctorId === leaving.id).id}/approve`,
+      ),
+    );
+    const row = await ctx.prisma.notification.findFirst({
+      where: { userId: leaving.userId, title: "Your account was deactivated" },
+    });
     assert.ok(row); // waiting for the doctor, even though the account is closed now
   });
 });
@@ -288,22 +373,45 @@ describe("support and accounts", () => {
 
   it("tells a signed-in person when support replies or resolves", async () => {
     const patient = await people.createPatient();
-    const created = ok(await patient.client.post("/support-requests", { message: "My code never arrived" }), 201);
+    const created = ok(
+      await patient.client.post("/support-requests", { message: "My code never arrived" }),
+      201,
+    );
     ok(await admins[0].client.patch(`/admin/support-requests/${created.id}`, { status: "in_progress" }));
     assert.ok(await find(patient, "Your support request is being handled"));
-    ok(await admins[0].client.post(`/admin/support-requests/${created.id}/reply`, { message: "We resent it, please check again." }));
+    ok(
+      await admins[0].client.post(`/admin/support-requests/${created.id}/reply`, {
+        message: "We resent it, please check again.",
+      }),
+    );
     assert.equal((await find(patient, "Carewell support replied")).body, "We resent it, please check again.");
   });
 
   it("sends security and welcome notices", async () => {
     const client = ctx.client();
     const email = "welcome.new@test.local";
-    ok(await client.post("/auth/patient/register", { name: "New Patient", email, phone: "+880 1711 000000", password: "correct-horse-1" }), 201);
-    const code = ctx.outbox.filter((mail) => mail.to === email).at(-1).text.match(/\b(\d{6})\b/)[1];
+    ok(
+      await client.post("/auth/patient/register", {
+        name: "New Patient",
+        email,
+        phone: "+880 1711 000000",
+        password: "correct-horse-1",
+      }),
+      201,
+    );
+    const code = ctx.outbox
+      .filter((mail) => mail.to === email)
+      .at(-1)
+      .text.match(/\b(\d{6})\b/)[1];
     ok(await client.post("/auth/verify-email", { code }));
     const patient = { client };
     assert.ok(await find(patient, "Email verified"));
-    ok(await client.post("/auth/change-password", { currentPassword: "correct-horse-1", newPassword: "another-pass-123" }));
+    ok(
+      await client.post("/auth/change-password", {
+        currentPassword: "correct-horse-1",
+        newPassword: "another-pass-123",
+      }),
+    );
     assert.ok(await find(patient, "Your password was changed"));
   });
 
@@ -312,7 +420,10 @@ describe("support and accounts", () => {
     const original = ctx.prisma.notification.create;
     ctx.prisma.notification.create = () => Promise.reject(new Error("boom"));
     try {
-      assert.equal(ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" })).status, "accepted");
+      assert.equal(
+        ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" })).status,
+        "accepted",
+      );
     } finally {
       ctx.prisma.notification.create = original;
     }

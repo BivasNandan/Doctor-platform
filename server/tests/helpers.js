@@ -12,7 +12,8 @@ const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = resolve(serverRoot, "..");
 
 export async function startTestApp() {
-  if (existsSync(resolve(projectRoot, ".env.local"))) dotenv.config({ path: resolve(projectRoot, ".env.local"), quiet: true });
+  if (existsSync(resolve(projectRoot, ".env.local")))
+    dotenv.config({ path: resolve(projectRoot, ".env.local"), quiet: true });
   const direct = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
   if (!direct) throw new Error("DATABASE_URL is not set (see the root .env.example).");
 
@@ -23,7 +24,9 @@ export async function startTestApp() {
   await admin.query(`CREATE SCHEMA "${schema}"`);
   await admin.query(`SET search_path TO "${schema}", public`); // public: the btree_gist extension lives there
   const migrations = resolve(serverRoot, "prisma/migrations");
-  for (const name of readdirSync(migrations).filter((entry) => /^\d/.test(entry)).sort())
+  for (const name of readdirSync(migrations)
+    .filter((entry) => /^\d/.test(entry))
+    .sort())
     await admin.query(readFileSync(resolve(migrations, name, "migration.sql"), "utf8"));
 
   // 2. Point the app at that schema BEFORE it is imported (config reads the environment once).
@@ -35,9 +38,10 @@ export async function startTestApp() {
 
   const { app } = await import("../src/app.js");
   const { prisma } = await import("../src/config/prisma.js");
-  const auth = await import("../src/auth.js");
-  const mappers = await import("../src/mappers.js");
-  const mail = await import("../src/mail.js");
+  const auth = await import("../src/services/auth.js");
+  const time = await import("../src/utils/time.js");
+  const limits = await import("../src/middleware/rateLimit.js");
+  const mail = await import("../src/services/mail.js");
 
   const server = await new Promise((done) => {
     const listening = app.listen(0, "127.0.0.1", () => done(listening));
@@ -49,10 +53,10 @@ export async function startTestApp() {
     prisma,
     /** Emails the app "sent" (nothing leaves the machine in tests). */
     outbox: mail.outbox,
-    resetRateLimits: auth.resetRateLimits,
+    resetRateLimits: limits.resetRateLimits,
     hashPassword: auth.hashPassword,
-    dhakaNow: mappers.dhakaNow,
-    addDays: mappers.addDays,
+    dhakaNow: time.dhakaNow,
+    addDays: time.addDays,
     client: () => makeClient(baseUrl),
     async stop() {
       await new Promise((done) => server.close(done));

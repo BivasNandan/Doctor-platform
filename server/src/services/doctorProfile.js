@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { prisma } from "./config/prisma.js";
-import { ApiError, conflict, isForeignKeyViolation } from "./http.js";
+import { prisma } from "../config/prisma.js";
+import { ApiError, conflict, isForeignKeyViolation } from "../utils/errors.js";
 
 // The editable part of a doctor profile, shared by administrators (any doctor) and by doctors
 // (their own profile).
@@ -24,8 +24,10 @@ export async function assertReferences({ specialtyId, facilityIds }) {
   ]);
   const details = {};
   if (!specialty) details.specialtyId = "Choose a valid specialty.";
-  if (clinics !== new Set(facilityIds).size) details.facilityIds = "Choose valid, active clinics or hospitals.";
-  if (Object.keys(details).length) throw new ApiError(422, "VALIDATION_FAILED", "Some of the submitted details are invalid.", details);
+  if (clinics !== new Set(facilityIds).size)
+    details.facilityIds = "Choose valid, active clinics or hospitals.";
+  if (Object.keys(details).length)
+    throw new ApiError(422, "VALIDATION_FAILED", "Some of the submitted details are invalid.", details);
 }
 
 /**

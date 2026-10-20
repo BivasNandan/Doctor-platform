@@ -10,11 +10,19 @@ const PASSWORD = "pass-word-123";
 const day = (offset) => ctx.addDays(ctx.dhakaNow().date, offset);
 
 const ok = (response, status = 200) => {
-  assert.equal(response.status, status, `expected ${status}, got ${response.status}: ${JSON.stringify(response.body)}`);
+  assert.equal(
+    response.status,
+    status,
+    `expected ${status}, got ${response.status}: ${JSON.stringify(response.body)}`,
+  );
   return response.body;
 };
 const fails = (response, status, code) => {
-  assert.equal(response.status, status, `expected ${status}, got ${response.status}: ${JSON.stringify(response.body)}`);
+  assert.equal(
+    response.status,
+    status,
+    `expected ${status}, got ${response.status}: ${JSON.stringify(response.body)}`,
+  );
   if (code) assert.equal(response.body.code, code);
   assert.equal(typeof response.body.message, "string");
   return response.body;
@@ -70,7 +78,16 @@ async function createPatient({ verified = true } = {}) {
 
 /** A slot created through the doctor's own API. */
 const addSlot = async (doctor, extra = {}) =>
-  ok(await doctor.client.post("/doctor/availability", { facilityId: clinic.id, date: day(2), startTime: "09:00", endTime: "09:30", ...extra }), 201);
+  ok(
+    await doctor.client.post("/doctor/availability", {
+      facilityId: clinic.id,
+      date: day(2),
+      startTime: "09:00",
+      endTime: "09:30",
+      ...extra,
+    }),
+    201,
+  );
 
 const bookingBody = (doctor, slot, extra = {}) => ({
   doctorId: doctor.id,
@@ -108,8 +125,16 @@ describe("open times for a doctor", () => {
     await addSlot(doctor, { date: day(3), startTime: "12:00", endTime: "12:30", status: "unavailable" });
     await addSlot(doctor, { date: day(4), startTime: "10:00", endTime: "10:30" });
 
-    const slots = ok(await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${clinic.id}&date=${day(3)}`));
-    assert.deepEqual(slots.map((slot) => [slot.label, slot.status]), [["9:00 AM", "available"], ["5:30 PM", "available"]]);
+    const slots = ok(
+      await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${clinic.id}&date=${day(3)}`),
+    );
+    assert.deepEqual(
+      slots.map((slot) => [slot.label, slot.status]),
+      [
+        ["9:00 AM", "available"],
+        ["5:30 PM", "available"],
+      ],
+    );
     assert.equal(slots[0].id, first.id);
   });
 
@@ -121,17 +146,35 @@ describe("open times for a doctor", () => {
     ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }));
     await addSlot(doctor, { date: day(0), startTime: "00:00", endTime: "00:10" });
 
-    const later = ok(await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${clinic.id}&date=${day(2)}`));
-    assert.deepEqual(later.map((slot) => slot.status), ["booked"]);
-    const today = ok(await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${clinic.id}&date=${day(0)}`));
-    assert.deepEqual(today.map((slot) => slot.status), ["passed"]);
+    const later = ok(
+      await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${clinic.id}&date=${day(2)}`),
+    );
+    assert.deepEqual(
+      later.map((slot) => slot.status),
+      ["booked"],
+    );
+    const today = ok(
+      await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${clinic.id}&date=${day(0)}`),
+    );
+    assert.deepEqual(
+      today.map((slot) => slot.status),
+      ["passed"],
+    );
   });
 
   it("answers 404 for unpublished doctors and clinics the doctor does not use", async () => {
     const hidden = await createDoctor({ published: false });
-    fails(await ctx.client().get(`/doctors/${hidden.id}/slots?facilityId=${clinic.id}&date=${day(2)}`), 404, "NOT_FOUND");
+    fails(
+      await ctx.client().get(`/doctors/${hidden.id}/slots?facilityId=${clinic.id}&date=${day(2)}`),
+      404,
+      "NOT_FOUND",
+    );
     const doctor = await createDoctor();
-    fails(await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${otherClinic.id}&date=${day(2)}`), 404, "NOT_FOUND");
+    fails(
+      await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${otherClinic.id}&date=${day(2)}`),
+      404,
+      "NOT_FOUND",
+    );
     fails(await ctx.client().get("/doctors/not-an-id/slots?facilityId=x&date=y"), 404, "NOT_FOUND");
     fails(await ctx.client().get(`/doctors/${doctor.id}/slots?date=${day(2)}`), 422, "VALIDATION_FAILED");
   });
@@ -158,7 +201,11 @@ describe("requesting an appointment", () => {
     const doctor = await createDoctor();
     const patient = await createPatient();
     const slot = await addSlot(doctor, { startTime: "17:30", endTime: "18:00" });
-    const { slotId, ...withoutId } = bookingBody(doctor, slot, { relationship: "child", patientName: "Ayaan Rahman", time: "5:30 PM" });
+    const { slotId, ...withoutId } = bookingBody(doctor, slot, {
+      relationship: "child",
+      patientName: "Ayaan Rahman",
+      time: "5:30 PM",
+    });
     assert.ok(slotId);
     const created = ok(await patient.client.post("/appointment-requests", withoutId), 201);
     assert.equal(created.relationship, "child");
@@ -169,9 +216,17 @@ describe("requesting an appointment", () => {
   it("needs a signed-in patient with a verified email", async () => {
     const doctor = await createDoctor();
     const slot = await addSlot(doctor);
-    fails(await ctx.client().post("/appointment-requests", bookingBody(doctor, slot)), 401, "UNAUTHENTICATED");
+    fails(
+      await ctx.client().post("/appointment-requests", bookingBody(doctor, slot)),
+      401,
+      "UNAUTHENTICATED",
+    );
     const unverified = await createPatient({ verified: false });
-    fails(await unverified.client.post("/appointment-requests", bookingBody(doctor, slot)), 403, "EMAIL_NOT_VERIFIED");
+    fails(
+      await unverified.client.post("/appointment-requests", bookingBody(doctor, slot)),
+      403,
+      "EMAIL_NOT_VERIFIED",
+    );
     fails(await doctor.client.post("/appointment-requests", bookingBody(doctor, slot)), 403, "FORBIDDEN");
   });
 
@@ -180,26 +235,64 @@ describe("requesting an appointment", () => {
     const patient = await createPatient();
     const slot = await addSlot(doctor);
     const body = fails(
-      await patient.client.post("/appointment-requests", bookingBody(doctor, slot, { patientName: "N", phone: "12", email: "nope", reason: "hi", relationship: "cousin" })),
+      await patient.client.post(
+        "/appointment-requests",
+        bookingBody(doctor, slot, {
+          patientName: "N",
+          phone: "12",
+          email: "nope",
+          reason: "hi",
+          relationship: "cousin",
+        }),
+      ),
       422,
       "VALIDATION_FAILED",
     );
-    assert.deepEqual(Object.keys(body.details).sort(), ["email", "patientName", "phone", "reason", "relationship"]);
+    assert.deepEqual(Object.keys(body.details).sort(), [
+      "email",
+      "patientName",
+      "phone",
+      "reason",
+      "relationship",
+    ]);
   });
 
   it("refuses blocked, past and unknown times", async () => {
     const doctor = await createDoctor();
     const patient = await createPatient();
     const blocked = await addSlot(doctor, { startTime: "13:00", endTime: "13:30", status: "unavailable" });
-    fails(await patient.client.post("/appointment-requests", bookingBody(doctor, blocked)), 422, "VALIDATION_FAILED");
+    fails(
+      await patient.client.post("/appointment-requests", bookingBody(doctor, blocked)),
+      422,
+      "VALIDATION_FAILED",
+    );
 
     const past = await addSlot(doctor, { date: day(0), startTime: "00:00", endTime: "00:10" });
-    fails(await patient.client.post("/appointment-requests", bookingBody(doctor, past)), 422, "VALIDATION_FAILED");
+    fails(
+      await patient.client.post("/appointment-requests", bookingBody(doctor, past)),
+      422,
+      "VALIDATION_FAILED",
+    );
 
     const slot = await addSlot(doctor, { startTime: "14:00", endTime: "14:30" });
-    fails(await patient.client.post("/appointment-requests", bookingBody(doctor, slot, { slotId: undefined, time: "3:00 AM" })), 422, "VALIDATION_FAILED");
-    fails(await patient.client.post("/appointment-requests", bookingBody(doctor, slot, { slotId: undefined })), 422, "VALIDATION_FAILED");
-    fails(await patient.client.post("/appointment-requests", bookingBody(doctor, slot, { date: day(5) })), 422, "VALIDATION_FAILED");
+    fails(
+      await patient.client.post(
+        "/appointment-requests",
+        bookingBody(doctor, slot, { slotId: undefined, time: "3:00 AM" }),
+      ),
+      422,
+      "VALIDATION_FAILED",
+    );
+    fails(
+      await patient.client.post("/appointment-requests", bookingBody(doctor, slot, { slotId: undefined })),
+      422,
+      "VALIDATION_FAILED",
+    );
+    fails(
+      await patient.client.post("/appointment-requests", bookingBody(doctor, slot, { date: day(5) })),
+      422,
+      "VALIDATION_FAILED",
+    );
   });
 
   it("only books published doctors at clinics where they practise", async () => {
@@ -210,7 +303,14 @@ describe("requesting an appointment", () => {
 
     const doctor = await createDoctor();
     const open = await addSlot(doctor);
-    fails(await patient.client.post("/appointment-requests", bookingBody(doctor, open, { facilityId: otherClinic.id })), 404, "NOT_FOUND");
+    fails(
+      await patient.client.post(
+        "/appointment-requests",
+        bookingBody(doctor, open, { facilityId: otherClinic.id }),
+      ),
+      404,
+      "NOT_FOUND",
+    );
   });
 
   it("refuses the same patient asking twice for one time", async () => {
@@ -218,7 +318,14 @@ describe("requesting an appointment", () => {
     const patient = await createPatient();
     const slot = await addSlot(doctor);
     ok(await patient.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
-    fails(await patient.client.post("/appointment-requests", bookingBody(doctor, slot, { relationship: "parent" })), 409, "DUPLICATE_REQUEST");
+    fails(
+      await patient.client.post(
+        "/appointment-requests",
+        bookingBody(doctor, slot, { relationship: "parent" }),
+      ),
+      409,
+      "DUPLICATE_REQUEST",
+    );
   });
 
   it("lets several patients ask for one time but only one be accepted", async () => {
@@ -229,10 +336,18 @@ describe("requesting an appointment", () => {
     const b = ok(await second.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
 
     ok(await doctor.client.patch(`/doctor/appointments/${a.id}`, { status: "accepted" }));
-    fails(await doctor.client.patch(`/doctor/appointments/${b.id}`, { status: "accepted" }), 409, "APPOINTMENT_CONFLICT");
+    fails(
+      await doctor.client.patch(`/doctor/appointments/${b.id}`, { status: "accepted" }),
+      409,
+      "APPOINTMENT_CONFLICT",
+    );
     // The time is gone for everyone else now.
     const third = await createPatient();
-    fails(await third.client.post("/appointment-requests", bookingBody(doctor, slot)), 409, "APPOINTMENT_CONFLICT");
+    fails(
+      await third.client.post("/appointment-requests", bookingBody(doctor, slot)),
+      409,
+      "APPOINTMENT_CONFLICT",
+    );
   });
 
   it("limits how many requests one patient can send per hour", async () => {
@@ -243,7 +358,11 @@ describe("requesting an appointment", () => {
       ok(await patient.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
     }
     const extra = await addSlot(doctor, { date: day(40) });
-    fails(await patient.client.post("/appointment-requests", bookingBody(doctor, extra)), 429, "RATE_LIMITED");
+    fails(
+      await patient.client.post("/appointment-requests", bookingBody(doctor, extra)),
+      429,
+      "RATE_LIMITED",
+    );
   });
 });
 
@@ -255,7 +374,13 @@ describe("a patient's own requests", () => {
     const b = await addSlot(doctor, { startTime: "10:00", endTime: "10:30" });
     const c = await addSlot(doctor, { startTime: "11:00", endTime: "11:30" });
     ok(await mine.client.post("/appointment-requests", bookingBody(doctor, a)), 201);
-    ok(await mine.client.post("/appointment-requests", bookingBody(doctor, b, { relationship: "spouse", patientName: "Karim Uddin" })), 201);
+    ok(
+      await mine.client.post(
+        "/appointment-requests",
+        bookingBody(doctor, b, { relationship: "spouse", patientName: "Karim Uddin" }),
+      ),
+      201,
+    );
     ok(await theirs.client.post("/appointment-requests", bookingBody(doctor, c)), 201);
 
     const list = ok(await mine.client.get("/appointments"));
@@ -270,8 +395,15 @@ describe("a patient's own requests", () => {
     const slot = await addSlot(doctor);
     const request = ok(await patient.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
 
-    assert.equal(ok(await patient.client.patch(`/appointment-requests/${request.id}`, { status: "cancelled" })).status, "cancelled");
-    fails(await patient.client.patch(`/appointment-requests/${request.id}`, { status: "cancelled" }), 409, "INVALID_TRANSITION");
+    assert.equal(
+      ok(await patient.client.patch(`/appointment-requests/${request.id}`, { status: "cancelled" })).status,
+      "cancelled",
+    );
+    fails(
+      await patient.client.patch(`/appointment-requests/${request.id}`, { status: "cancelled" }),
+      409,
+      "INVALID_TRANSITION",
+    );
   });
 
   it("frees the time when an accepted request is cancelled", async () => {
@@ -280,7 +412,11 @@ describe("a patient's own requests", () => {
     const slot = await addSlot(doctor);
     const request = ok(await first.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
     ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }));
-    fails(await second.client.post("/appointment-requests", bookingBody(doctor, slot)), 409, "APPOINTMENT_CONFLICT");
+    fails(
+      await second.client.post("/appointment-requests", bookingBody(doctor, slot)),
+      409,
+      "APPOINTMENT_CONFLICT",
+    );
 
     ok(await first.client.patch(`/appointment-requests/${request.id}`, { status: "cancelled" }));
     ok(await second.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
@@ -292,9 +428,21 @@ describe("a patient's own requests", () => {
     const slot = await addSlot(doctor);
     const request = ok(await owner.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
 
-    fails(await stranger.client.patch(`/appointment-requests/${request.id}`, { status: "cancelled" }), 404, "NOT_FOUND");
-    fails(await owner.client.patch(`/appointment-requests/${request.id}`, { status: "accepted" }), 422, "VALIDATION_FAILED");
-    fails(await owner.client.patch("/appointment-requests/not-an-id", { status: "cancelled" }), 404, "NOT_FOUND");
+    fails(
+      await stranger.client.patch(`/appointment-requests/${request.id}`, { status: "cancelled" }),
+      404,
+      "NOT_FOUND",
+    );
+    fails(
+      await owner.client.patch(`/appointment-requests/${request.id}`, { status: "accepted" }),
+      422,
+      "VALIDATION_FAILED",
+    );
+    fails(
+      await owner.client.patch("/appointment-requests/not-an-id", { status: "cancelled" }),
+      404,
+      "NOT_FOUND",
+    );
   });
 });
 
@@ -303,25 +451,49 @@ describe("the doctor's requests", () => {
     const [one, two] = [await createDoctor(), await createDoctor()];
     const patient = await createPatient();
     const slot = await addSlot(one);
-    const request = ok(await patient.client.post("/appointment-requests", bookingBody(one, slot, { reason: "Needs a checkup" })), 201);
+    const request = ok(
+      await patient.client.post(
+        "/appointment-requests",
+        bookingBody(one, slot, { reason: "Needs a checkup" }),
+      ),
+      201,
+    );
 
     const mine = ok(await one.client.get("/doctor/appointments"));
-    assert.deepEqual(mine.map((item) => item.id), [request.id]);
+    assert.deepEqual(
+      mine.map((item) => item.id),
+      [request.id],
+    );
     assert.equal(mine[0].phone, "+880 1711 000000"); // contact details are visible to the treating doctor
     assert.deepEqual(ok(await two.client.get("/doctor/appointments")), []);
-    fails(await two.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }), 404, "NOT_FOUND");
+    fails(
+      await two.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }),
+      404,
+      "NOT_FOUND",
+    );
   });
 
   it("accepts and rejects pending requests, opening a conversation on accept", async () => {
     const doctor = await createDoctor();
     const patient = await createPatient();
-    const [a, b] = [await addSlot(doctor, { startTime: "09:00", endTime: "09:30" }), await addSlot(doctor, { startTime: "10:00", endTime: "10:30" })];
+    const [a, b] = [
+      await addSlot(doctor, { startTime: "09:00", endTime: "09:30" }),
+      await addSlot(doctor, { startTime: "10:00", endTime: "10:30" }),
+    ];
     const toAccept = ok(await patient.client.post("/appointment-requests", bookingBody(doctor, a)), 201);
     const toReject = ok(await patient.client.post("/appointment-requests", bookingBody(doctor, b)), 201);
 
-    assert.equal(ok(await doctor.client.patch(`/doctor/appointments/${toAccept.id}`, { status: "accepted" })).status, "accepted");
-    assert.equal(ok(await doctor.client.patch(`/doctor/appointments/${toReject.id}`, { status: "rejected" })).status, "rejected");
-    const threads = await ctx.prisma.conversation.findMany({ where: { doctorId: doctor.id, patientId: patient.id } });
+    assert.equal(
+      ok(await doctor.client.patch(`/doctor/appointments/${toAccept.id}`, { status: "accepted" })).status,
+      "accepted",
+    );
+    assert.equal(
+      ok(await doctor.client.patch(`/doctor/appointments/${toReject.id}`, { status: "rejected" })).status,
+      "rejected",
+    );
+    const threads = await ctx.prisma.conversation.findMany({
+      where: { doctorId: doctor.id, patientId: patient.id },
+    });
     assert.equal(threads.length, 1);
     assert.equal(threads[0].kind, "patient_doctor");
   });
@@ -332,9 +504,17 @@ describe("the doctor's requests", () => {
     const slot = await addSlot(doctor);
     const request = ok(await patient.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
 
-    fails(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "completed" }), 422, "VALIDATION_FAILED");
+    fails(
+      await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "completed" }),
+      422,
+      "VALIDATION_FAILED",
+    );
     ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }));
-    fails(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "rejected" }), 409, "INVALID_TRANSITION");
+    fails(
+      await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "rejected" }),
+      409,
+      "INVALID_TRANSITION",
+    );
   });
 
   it("keeps patients, administrators and guests out of the doctor workspace", async () => {
@@ -349,11 +529,33 @@ describe("the doctor's availability", () => {
   it("creates, lists, blocks, moves and removes their own slots", async () => {
     const doctor = await createDoctor();
     const slot = await addSlot(doctor);
-    assert.deepEqual({ ...slot, id: undefined }, { id: undefined, doctorId: doctor.id, facilityId: clinic.id, date: day(2), startTime: "09:00", endTime: "09:30", status: "available" });
+    assert.deepEqual(
+      { ...slot, id: undefined },
+      {
+        id: undefined,
+        doctorId: doctor.id,
+        facilityId: clinic.id,
+        date: day(2),
+        startTime: "09:00",
+        endTime: "09:30",
+        status: "available",
+      },
+    );
     assert.equal((await ok(await doctor.client.get("/doctor/availability"))).length, 1);
 
-    assert.equal(ok(await doctor.client.patch(`/doctor/availability/${slot.id}`, { status: "unavailable" })).status, "unavailable");
-    assert.equal(ok(await doctor.client.patch(`/doctor/availability/${slot.id}`, { startTime: "15:00", endTime: "15:30" })).startTime, "15:00");
+    assert.equal(
+      ok(await doctor.client.patch(`/doctor/availability/${slot.id}`, { status: "unavailable" })).status,
+      "unavailable",
+    );
+    assert.equal(
+      ok(
+        await doctor.client.patch(`/doctor/availability/${slot.id}`, {
+          startTime: "15:00",
+          endTime: "15:30",
+        }),
+      ).startTime,
+      "15:00",
+    );
     assert.equal((await doctor.client.delete(`/doctor/availability/${slot.id}`)).status, 204);
     assert.deepEqual(ok(await doctor.client.get("/doctor/availability")), []);
   });
@@ -361,11 +563,22 @@ describe("the doctor's availability", () => {
   it("validates times, dates, clinics and overlaps", async () => {
     const doctor = await createDoctor();
     await addSlot(doctor);
-    const post = (extra) => doctor.client.post("/doctor/availability", { facilityId: clinic.id, date: day(2), startTime: "09:00", endTime: "09:30", ...extra });
+    const post = (extra) =>
+      doctor.client.post("/doctor/availability", {
+        facilityId: clinic.id,
+        date: day(2),
+        startTime: "09:00",
+        endTime: "09:30",
+        ...extra,
+      });
     fails(await post({ startTime: "09:15", endTime: "09:45" }), 409, "SLOT_OVERLAP");
     fails(await post({ startTime: "11:00", endTime: "10:00" }), 422, "VALIDATION_FAILED");
     fails(await post({ date: day(-1), startTime: "12:00", endTime: "12:30" }), 422, "VALIDATION_FAILED");
-    fails(await post({ facilityId: otherClinic.id, startTime: "12:00", endTime: "12:30" }), 422, "VALIDATION_FAILED");
+    fails(
+      await post({ facilityId: otherClinic.id, startTime: "12:00", endTime: "12:30" }),
+      422,
+      "VALIDATION_FAILED",
+    );
     ok(await post({ startTime: "09:30", endTime: "10:00" }), 201); // back-to-back is fine
   });
 
@@ -373,10 +586,23 @@ describe("the doctor's availability", () => {
     const [owner, other] = [await createDoctor(), await createDoctor()];
     const slot = await addSlot(owner);
     assert.deepEqual(ok(await other.client.get("/doctor/availability")), []);
-    fails(await other.client.patch(`/doctor/availability/${slot.id}`, { status: "unavailable" }), 404, "NOT_FOUND");
+    fails(
+      await other.client.patch(`/doctor/availability/${slot.id}`, { status: "unavailable" }),
+      404,
+      "NOT_FOUND",
+    );
     fails(await other.client.delete(`/doctor/availability/${slot.id}`), 404, "NOT_FOUND");
     // A doctor id in the body is ignored: the slot still belongs to whoever is signed in.
-    const created = ok(await other.client.post("/doctor/availability", { doctorId: owner.id, facilityId: clinic.id, date: day(2), startTime: "09:00", endTime: "09:30" }), 201);
+    const created = ok(
+      await other.client.post("/doctor/availability", {
+        doctorId: owner.id,
+        facilityId: clinic.id,
+        date: day(2),
+        startTime: "09:00",
+        endTime: "09:30",
+      }),
+      201,
+    );
     assert.equal(created.doctorId, other.id);
   });
 
@@ -427,15 +653,26 @@ describe("the doctor's own profile", () => {
 
   it("flags the profile for review when the specialty, qualifications or clinics change", async () => {
     const doctor = await createDoctor();
-    const saved = ok(await doctor.client.patch("/doctor/profile", profile(doctor, { specialtyId: "neurology" })));
+    const saved = ok(
+      await doctor.client.patch("/doctor/profile", profile(doctor, { specialtyId: "neurology" })),
+    );
     assert.equal(saved.reviewRequired, true);
     assert.equal(saved.profileReviewRequired, true);
     assert.equal(saved.specialty, "Neurology");
 
     const second = await createDoctor();
-    assert.equal(ok(await second.client.patch("/doctor/profile", profile(second, { qualifications: ["MBBS", "FCPS"] }))).reviewRequired, true);
+    assert.equal(
+      ok(await second.client.patch("/doctor/profile", profile(second, { qualifications: ["MBBS", "FCPS"] })))
+        .reviewRequired,
+      true,
+    );
     const third = await createDoctor();
-    const withClinic = ok(await third.client.patch("/doctor/profile", profile(third, { facilityIds: [clinic.id, otherClinic.id] })));
+    const withClinic = ok(
+      await third.client.patch(
+        "/doctor/profile",
+        profile(third, { facilityIds: [clinic.id, otherClinic.id] }),
+      ),
+    );
     assert.equal(withClinic.reviewRequired, true);
     assert.deepEqual(withClinic.facilityIds.sort(), [clinic.id, otherClinic.id].sort());
   });
@@ -443,13 +680,30 @@ describe("the doctor's own profile", () => {
   it("keeps a clinic that still has availability", async () => {
     const doctor = await createDoctor({ clinics: [clinic, otherClinic] });
     await addSlot(doctor, { facilityId: otherClinic.id });
-    fails(await doctor.client.patch("/doctor/profile", profile(doctor, { facilityIds: [clinic.id] })), 409, "CLINIC_IN_USE");
+    fails(
+      await doctor.client.patch("/doctor/profile", profile(doctor, { facilityIds: [clinic.id] })),
+      409,
+      "CLINIC_IN_USE",
+    );
   });
 
   it("validates the profile and its references", async () => {
     const doctor = await createDoctor();
-    const body = fails(await doctor.client.patch("/doctor/profile", profile(doctor, { name: "D", fee: -5, qualifications: [], facilityIds: [] })), 422, "VALIDATION_FAILED");
-    assert.ok(body.details.name && body.details.fee && body.details.qualifications && body.details.facilityIds);
-    fails(await doctor.client.patch("/doctor/profile", profile(doctor, { specialtyId: "astrology" })), 422, "VALIDATION_FAILED");
+    const body = fails(
+      await doctor.client.patch(
+        "/doctor/profile",
+        profile(doctor, { name: "D", fee: -5, qualifications: [], facilityIds: [] }),
+      ),
+      422,
+      "VALIDATION_FAILED",
+    );
+    assert.ok(
+      body.details.name && body.details.fee && body.details.qualifications && body.details.facilityIds,
+    );
+    fails(
+      await doctor.client.patch("/doctor/profile", profile(doctor, { specialtyId: "astrology" })),
+      422,
+      "VALIDATION_FAILED",
+    );
   });
 });

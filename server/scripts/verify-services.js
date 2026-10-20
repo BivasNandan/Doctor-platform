@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { pool } from "../src/db/pool.js";
-import { closeStorage, deleteObject, getObject, putObject } from "../src/storage/objectStore.js";
+import { pool } from "../src/config/pool.js";
+import { closeStorage, deleteObject, getObject, putObject } from "../src/services/storage.js";
 
 const key = `verification/${randomUUID()}.txt`;
 const contents = Buffer.from(`carewell-neon-verification:${randomUUID()}`);

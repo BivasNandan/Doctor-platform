@@ -4,12 +4,20 @@ import assert from "node:assert/strict";
 export const PASSWORD = "pass-word-123";
 
 export const ok = (response, status = 200) => {
-  assert.equal(response.status, status, `expected ${status}, got ${response.status}: ${JSON.stringify(response.body)}`);
+  assert.equal(
+    response.status,
+    status,
+    `expected ${status}, got ${response.status}: ${JSON.stringify(response.body)}`,
+  );
   return response.body;
 };
 
 export const fails = (response, status, code) => {
-  assert.equal(response.status, status, `expected ${status}, got ${response.status}: ${JSON.stringify(response.body)}`);
+  assert.equal(
+    response.status,
+    status,
+    `expected ${status}, got ${response.status}: ${JSON.stringify(response.body)}`,
+  );
   if (code) assert.equal(response.body.code, code);
   assert.equal(typeof response.body.message, "string");
   return response.body;
@@ -43,7 +51,13 @@ export function makePeople(ctx) {
   async function createAdmin() {
     const email = `admin${++counter}@test.local`;
     await ctx.prisma.user.create({
-      data: { name: `Admin ${counter}`, email, passwordHash: await ctx.hashPassword(PASSWORD), role: "admin", emailVerifiedAt: new Date() },
+      data: {
+        name: `Admin ${counter}`,
+        email,
+        passwordHash: await ctx.hashPassword(PASSWORD),
+        role: "admin",
+        emailVerifiedAt: new Date(),
+      },
     });
     return { email, client: await signIn(email, "admin") };
   }
@@ -72,7 +86,13 @@ export function makePeople(ctx) {
       },
       include: { doctor: true },
     });
-    return { id: user.doctor.id, userId: user.id, email, name: user.name, client: await signIn(email, "doctor") };
+    return {
+      id: user.doctor.id,
+      userId: user.id,
+      email,
+      name: user.name,
+      client: await signIn(email, "doctor"),
+    };
   }
 
   async function createPatient({ verified = true } = {}) {
@@ -94,7 +114,12 @@ export function makePeople(ctx) {
    * An appointment between the two, written straight to the database so these tests do not
    * depend on the booking feature. Also opens the patient↔doctor conversation, like accepting does.
    */
-  async function createAppointment(doctor, patient, clinic, { status = "accepted", withConversation = true, hour = 9 } = {}) {
+  async function createAppointment(
+    doctor,
+    patient,
+    clinic,
+    { status = "accepted", withConversation = true, hour = 9 } = {},
+  ) {
     const startTime = `${String(hour).padStart(2, "0")}:00`;
     const slot = await ctx.prisma.availabilitySlot.create({
       data: {

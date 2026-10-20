@@ -1,6 +1,6 @@
-import { prisma } from "./config/prisma.js";
-import { conflict } from "./http.js";
-import { appointmentInclude, toAppointment } from "./mappers.js";
+import { prisma } from "../config/prisma.js";
+import { appointmentInclude, toAppointment } from "../models/appointment.js";
+import { conflict } from "../utils/errors.js";
 import { LINKS, notify, notifyDoctor } from "./notifications.js";
 
 // Who may move an appointment request from which status to which. `completed` is only ever set by
@@ -25,21 +25,57 @@ async function announce(actor, appointment, patientId) {
 
   if (toPatient) {
     const text = {
-      accepted: [`Appointment accepted`, `${doctor} accepted your request for ${when} at ${appointment.facility.name}. You can now message the doctor.`],
-      rejected: [`Appointment not accepted`, `${doctor} could not accept your request for ${when}. You can choose another time.`],
-      cancelled: [`Appointment cancelled${by}`, `Your appointment with ${doctor} on ${when} was cancelled${by}.`],
-      completed: [`Appointment completed`, `Your appointment with ${doctor} on ${when} was marked as completed.`],
+      accepted: [
+        `Appointment accepted`,
+        `${doctor} accepted your request for ${when} at ${appointment.facility.name}. You can now message the doctor.`,
+      ],
+      rejected: [
+        `Appointment not accepted`,
+        `${doctor} could not accept your request for ${when}. You can choose another time.`,
+      ],
+      cancelled: [
+        `Appointment cancelled${by}`,
+        `Your appointment with ${doctor} on ${when} was cancelled${by}.`,
+      ],
+      completed: [
+        `Appointment completed`,
+        `Your appointment with ${doctor} on ${when} was marked as completed.`,
+      ],
     }[status];
-    if (text) await notify(patientId, { kind: "appointment", title: text[0], body: text[1], link: status === "accepted" ? LINKS.messages : LINKS.appointments });
+    if (text)
+      await notify(patientId, {
+        kind: "appointment",
+        title: text[0],
+        body: text[1],
+        link: status === "accepted" ? LINKS.messages : LINKS.appointments,
+      });
   }
   if (toDoctor) {
     const text = {
-      accepted: [`Appointment accepted${by}`, `${appointment.patientName}'s request for ${when} was accepted${by}.`],
-      rejected: [`Appointment rejected${by}`, `${appointment.patientName}'s request for ${when} was rejected${by}.`],
-      cancelled: [actor === "patient" ? "Appointment cancelled by the patient" : `Appointment cancelled${by}`, `${appointment.patientName}'s appointment on ${when} was cancelled.`],
-      completed: [`Appointment completed`, `${appointment.patientName}'s appointment on ${when} was marked as completed.`],
+      accepted: [
+        `Appointment accepted${by}`,
+        `${appointment.patientName}'s request for ${when} was accepted${by}.`,
+      ],
+      rejected: [
+        `Appointment rejected${by}`,
+        `${appointment.patientName}'s request for ${when} was rejected${by}.`,
+      ],
+      cancelled: [
+        actor === "patient" ? "Appointment cancelled by the patient" : `Appointment cancelled${by}`,
+        `${appointment.patientName}'s appointment on ${when} was cancelled.`,
+      ],
+      completed: [
+        `Appointment completed`,
+        `${appointment.patientName}'s appointment on ${when} was marked as completed.`,
+      ],
     }[status];
-    if (text) await notifyDoctor(appointment.doctorId, { kind: "appointment", title: text[0], body: text[1], link: LINKS.doctorDashboard });
+    if (text)
+      await notifyDoctor(appointment.doctorId, {
+        kind: "appointment",
+        title: text[0],
+        body: text[1],
+        link: LINKS.doctorDashboard,
+      });
   }
 }
 

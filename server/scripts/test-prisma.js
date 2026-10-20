@@ -1,16 +1,15 @@
-import "../src/config/env.js";
 import { prisma } from "../src/config/prisma.js";
 
 try {
-    await prisma.$connect();
+  await prisma.$connect();
 
-    const result = await prisma.$queryRaw `SELECT 1 AS CONNECTED`;
+  const result = await prisma.$queryRaw`SELECT 1 AS CONNECTED`;
 
-    console.log("Prisma is connected to Neon DB successfully");
-    console.log(result);
+  console.log("Prisma is connected to Neon DB successfully");
+  console.log(result);
 } catch (error) {
-    console.error("Database connection failed: ", error.message);
-    process.exitCode = 1;
+  console.error("Database connection failed: ", error.message);
+  process.exitCode = 1;
 } finally {
-    await prisma.$disconnect();
+  await prisma.$disconnect();
 }

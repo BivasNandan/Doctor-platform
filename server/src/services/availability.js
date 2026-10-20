@@ -1,12 +1,16 @@
 import { z } from "zod";
-import { prisma } from "./config/prisma.js";
-import { ApiError, conflict, isForeignKeyViolation, notFound } from "./http.js";
-import { dhakaNow, minutesOf, slotInclude, toDbDate, toDbTime, toSlot } from "./mappers.js";
+import { prisma } from "../config/prisma.js";
+import { slotInclude, toSlot } from "../models/appointment.js";
+import { ApiError, conflict, isForeignKeyViolation, notFound } from "../utils/errors.js";
+import { dhakaNow, minutesOf, toDbDate, toDbTime } from "../utils/time.js";
 
 // Availability slots, shared by the administrator routes (any doctor) and the doctor workspace
 // (own schedule only). Routes pass `doctorId` to restrict access to one doctor's slots.
 
-const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.").refine((value) => !Number.isNaN(Date.parse(value)), "Not a real date.");
+const day = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD.")
+  .refine((value) => !Number.isNaN(Date.parse(value)), "Not a real date.");
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:mm.");
 
 export const slotFields = {
@@ -30,9 +34,13 @@ export async function assertDoctorAtClinic(doctorId, clinicId) {
 
 export function assertValidSlot({ date, startTime, endTime }) {
   if (minutesOf(startTime) >= minutesOf(endTime))
-    throw new ApiError(422, "VALIDATION_FAILED", "End time must be after start time.", { endTime: "End time must be after start time." });
+    throw new ApiError(422, "VALIDATION_FAILED", "End time must be after start time.", {
+      endTime: "End time must be after start time.",
+    });
   if (date < dhakaNow().date)
-    throw new ApiError(422, "VALIDATION_FAILED", "Availability cannot be added in the past.", { date: "Choose today or a later date." });
+    throw new ApiError(422, "VALIDATION_FAILED", "Availability cannot be added in the past.", {
+      date: "Choose today or a later date.",
+    });
 }
 
 /** All slots of one doctor, earliest first. */
@@ -101,7 +109,10 @@ export async function updateSlot(id, changes, doctorId) {
   } catch (error) {
     // Requests already point at this slot: it cannot move to another clinic, only be blocked.
     if (isForeignKeyViolation(error))
-      throw conflict("SLOT_IN_USE", "This slot has appointment requests, so it cannot move to another clinic. Block it instead.");
+      throw conflict(
+        "SLOT_IN_USE",
+        "This slot has appointment requests, so it cannot move to another clinic. Block it instead.",
+      );
     throw error;
   }
 }
@@ -112,7 +123,10 @@ export async function removeSlot(id, doctorId) {
     await prisma.availabilitySlot.delete({ where: { id } });
   } catch (error) {
     if (isForeignKeyViolation(error))
-      throw conflict("SLOT_IN_USE", "This slot has appointment requests, so it cannot be removed. Block it instead.");
+      throw conflict(
+        "SLOT_IN_USE",
+        "This slot has appointment requests, so it cannot be removed. Block it instead.",
+      );
     throw error;
   }
 }

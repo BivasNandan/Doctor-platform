@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { ApiError } from "./http.js";
-import { deleteObject, getObject, putObject } from "./storage/objectStore.js";
-import { looksLike } from "./upload.js";
+import { ApiError } from "../utils/errors.js";
+import { deleteObject, getObject, putObject } from "./storage.js";
 
 /**
  * Stores uploaded files in the private object-storage bucket and reads them back.
@@ -18,8 +17,14 @@ export const ATTACHMENT_TYPES = [...DOCUMENT_TYPES, "image/gif"];
 
 /** A file name that is safe to store and to put in a download header. */
 export function safeFileName(original) {
-  const base = String(original ?? "file").split(/[\\/]/).pop();
-  const cleaned = base.replace(/[^\w.\- ()]+/g, "_").replace(/^\.+/, "").trim().slice(-120);
+  const base = String(original ?? "file")
+    .split(/[\\/]/)
+    .pop();
+  const cleaned = base
+    .replace(/[^\w.\- ()]+/g, "_")
+    .replace(/^\.+/, "")
+    .trim()
+    .slice(-120);
   return cleaned || "file";
 }
 
@@ -29,7 +34,9 @@ export function safeFileName(original) {
  */
 export async function saveUpload(folder, file) {
   if (!looksLike(file.mimetype, file.buffer))
-    throw new ApiError(422, "UNSUPPORTED_FILE", "That file does not look like the type it claims to be.", { file: "Unsupported file." });
+    throw new ApiError(422, "UNSUPPORTED_FILE", "That file does not look like the type it claims to be.", {
+      file: "Unsupported file.",
+    });
   const fileName = safeFileName(file.originalname);
   const storageKey = `${prefix()}${folder}/${randomUUID()}-${fileName.replace(/ /g, "_")}`;
   await putObject(storageKey, file.buffer, file.mimetype);
@@ -49,7 +56,10 @@ export async function discardUpload(storageKey) {
 export async function sendStoredFile(response, { storageKey, fileName, fileType }, { inline = false } = {}) {
   const body = await getObject(storageKey);
   // Rows that do not record a type (certificates) get it from the file's own first bytes.
-  const type = fileType ?? ATTACHMENT_TYPES.find((candidate) => looksLike(candidate, body)) ?? "application/octet-stream";
+  const type =
+    fileType ??
+    ATTACHMENT_TYPES.find((candidate) => looksLike(candidate, body)) ??
+    "application/octet-stream";
   response.set({
     "Content-Type": type,
     "Content-Length": String(body.length),
@@ -59,3 +69,15 @@ export async function sendStoredFile(response, { storageKey, fileName, fileType 
   });
   response.end(body);
 }
+
+const SIGNATURES = {
+  "application/pdf": [[0x25, 0x50, 0x44, 0x46]],
+  "image/jpeg": [[0xff, 0xd8, 0xff]],
+  "image/png": [[0x89, 0x50, 0x4e, 0x47]],
+  "image/gif": [[0x47, 0x49, 0x46, 0x38]],
+  "image/webp": [[0x52, 0x49, 0x46, 0x46]],
+};
+
+/** True when the first bytes of `buffer` match the declared type, so a renamed .exe is refused. */
+export const looksLike = (mimetype, buffer) =>
+  (SIGNATURES[mimetype] ?? []).some((signature) => signature.every((byte, index) => buffer[index] === byte));
