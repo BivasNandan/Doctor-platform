@@ -122,8 +122,8 @@ The API's tests build a throw-away schema from the migrations and delete it afte
 ## How it is built
 
 ```text
-client/   React app: features/ (pages by area), components/, services/ (real API or demo data), styles/
-server/   Express API: src/routes/ (one file per feature), src/ helpers, prisma/ (schema + migrations), tests/
+client/   React app: pages/, components/, hooks/, context/, services/ (real API or demo data), utils/, styles/
+server/   Express API: routes/ → controllers/ → services/ → models/ (+ middleware/, utils/), prisma/ (schema + migrations), tests/
 docs/     API_CONTRACT.md · DATA_MODEL.md · ARCHITECTURE.md · BACKEND_GUIDE.md · PRD_TRACEABILITY.md
 scripts/  setup.mjs · dev.mjs
 .github/  CI and GitHub Pages deployment
@@ -134,19 +134,9 @@ scripts/  setup.mjs · dev.mjs
 - Sign-in uses an HttpOnly cookie session; the database enforces the important rules (no double-booked times, only
   verified doctors can be published) so they cannot be bypassed.
 - Never run `prisma db push`. Change `server/prisma/schema.prisma`, then create a migration.
-- To add an API feature: create `server/src/routes/<name>.js`, mount it with one line in
-  `server/src/routes/index.js`, and add `server/tests/<name>.test.js`. See
+- To add an API feature: create `server/src/controllers/<name>.js` (handlers) and `server/src/routes/<name>.js` (URLs),
+  mount the router with one line in `server/src/routes/index.js`, and add `server/tests/<name>.test.js`. See
   [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Credits
-
-- **Design and original frontend:** Tahiya Zareen Hiya, Wasikul Fahim and AfsaraTasnimRoza (see the Git history of
-  `main` for the exact commits).
-- **Frontend restructure, API layer, backend and database schema:** Adullah al Jubayer.
-- **Backend parts for booking/doctor workspace and for messaging/support/doctor onboarding:** the teammates who
-  deliver them, in their own commits.
-
-Credit follows the Git history: please merge with merge commits, never squash, so every author's commits stay visible.
 
 ## Contributing
 

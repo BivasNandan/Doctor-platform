@@ -38,13 +38,14 @@ verification, password reset, profile), patient booking, the doctor workspace, d
 messaging (patient↔doctor, doctor↔administration) with attachments, support requests, deactivation requests and
 **notifications for all three roles**.
 
-Adding a feature: create `server/src/routes/<name>.js`, add one line to `server/src/routes/index.js`, and write
-`server/tests/<name>.test.js`. Shared helpers: `mail.js` (email), `upload.js` / `files.js` (file uploads and storage),
-`http.js` (errors and validation), `auth.js` (sessions, roles, rate limits) and `notifications.js`.
+Adding a feature: create `controllers/<name>.js` (the handlers) and `routes/<name>.js` (the URLs), add one line to
+`routes/index.js`, and write `tests/<name>.test.js`. Shared pieces: `services/mail.js` (email), `middleware/upload.js` + `services/files.js` (uploads and storage),
+`utils/errors.js` (errors and validation), `middleware/authenticate.js` + `middleware/rateLimit.js` (roles, sessions,
+limits) and `services/notifications.js`.
 
 **Notifying people.** When something happens that another person should know about, call
 `notify(userId, { kind, title, body, link, groupKey })`, `notifyDoctor(doctorId, …)` or `notifyAdmins(…)` after the
-action succeeded (see `appointments.js` for a full example). It never throws, so a notification cannot break the
+action succeeded (see `services/appointments.js` for a full example). It never throws, so a notification cannot break the
 action. Give repeated events about one thing the same `groupKey` (for example `message:<conversationId>`) so they stay
 a single unread line; clear it with `markGroupRead` when the person looks at it. Add a test that checks who is
 told, and who is not (never the person who acted).
@@ -54,39 +55,31 @@ one origin: no CORS configuration is needed in development and cookies stay same
 and API under the same site (e.g. `carewell.example` and `api.carewell.example`) and configure CORS for the exact
 client origin with `credentials: true`.
 
-## 3. Suggested server layout
+## 3. Server layout
+
+The API uses the classic layers. Dependencies point one way: `routes → middleware → controllers → services → models`.
 
 ```text
 server/
 ├─ src/
-│  ├─ app.js                 # express() setup: helmet, cors, json, cookies, routes, error handler
+│  ├─ app.js                 # express() setup: helmet, cors, json, routes, error handler
 │  ├─ server.js              # listen()
-│  ├─ config/                # env parsing + validation (zod / envalid); fail fast on missing vars
-│  ├─ db/
-│  │  ├─ pool.js             # pg Pool
-│  │  └─ migrations/         # SQL or node-pg-migrate files, one per change
-│  ├─ middleware/            # authenticate, requireRole, validate, rateLimit, errorHandler
-│  ├─ modules/               # one folder per resource, mirrors client/src/services/api.js
-│  │  ├─ auth/               #   routes.js · controller.js · service.js · repository.js · schema.js
-│  │  ├─ doctors/
-│  │  ├─ facilities/
-│  │  ├─ specialties/
-│  │  ├─ appointments/
-│  │  ├─ availability/
-│  │  ├─ messaging/
-│  │  └─ admin/
-│  └─ utils/                 # ApiError, logger, ids, dates
-├─ tests/                    # supertest integration tests against a throwaway database
-├─ .env.example
-└─ package.json
+│  ├─ config/                # env.js (validated environment), prisma.js, pool.js (database clients)
+│  ├─ routes/                # URL -> controller, plus which middleware guards it (one file per feature, index.js mounts them)
+│  ├─ controllers/           # the request handlers: read the request, call services, send the response
+│  ├─ middleware/            # authenticate (sessions, roles, CSRF origin check), rateLimit, upload, errorHandler
+│  ├─ services/              # business rules: auth/sessions, appointments, availability, doctorProfile, notifications,
+│  │                         #   mail, files + storage (object storage)
+│  ├─ models/                # database access and row -> API shape mapping (user, doctor, catalog, appointment)
+│  └─ utils/                 # errors.js (ApiError, validation, uuid check), time.js (Dhaka dates and times)
+├─ prisma/                   # schema.prisma + SQL migrations (the database design and its rules)
+├─ scripts/                  # seed.js (first administrator), verify-services.js
+└─ tests/                    # API tests; they run in a temporary schema of the real database
 ```
 
-Keep layers thin and one-directional: `routes → controller → service → repository (SQL)`. Business rules live in
-services; SQL lives only in repositories; controllers only translate HTTP.
-
-Recommended libraries (all optional): `express`, `helmet`, `cors`, `cookie-parser`/`express-session` +
-`connect-pg-simple`, `zod` (validation), `pg` + `node-pg-migrate`, `argon2`, `express-rate-limit`, `pino`,
-`multer` (uploads), `vitest` + `supertest`.
+Keep layers thin: a route only maps a URL; a controller only translates HTTP; business rules live in services; shaping
+database rows for the API lives in models. Libraries in use: `express`, `helmet`, `cors`, `zod`, `@prisma/client`,
+`bcryptjs`, `multer`, `nodemailer`.
 
 ## 4. Build order
 
