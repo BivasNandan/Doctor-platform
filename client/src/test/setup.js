@@ -12,6 +12,23 @@ window.matchMedia = vi.fn().mockImplementation((query) => ({
   removeEventListener: vi.fn(),
 }));
 
+// jsdom has no IntersectionObserver (framer-motion's whileInView needs one). Treat everything as visible.
+class FakeIntersectionObserver {
+  constructor(callback) {
+    this.callback = callback;
+  }
+  observe(element) {
+    this.callback([{ isIntersecting: true, intersectionRatio: 1, target: element }], this);
+  }
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+window.IntersectionObserver = FakeIntersectionObserver;
+globalThis.IntersectionObserver = FakeIntersectionObserver;
+
 beforeEach(() => {
   resetDemoDb();
   window.location.hash = "";

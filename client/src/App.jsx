@@ -1,48 +1,41 @@
 import { lazy } from "react";
-import { Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
-import AppShell from "./components/Layout.jsx";
-import { EmptyState, PageLoader } from "./components/ui.jsx";
+import { Navigate, Route, Routes } from "react-router-dom";
+import AppShell from "./components/layout/AppShell.jsx";
+import RequireRole from "./components/RequireRole.jsx";
 import { PATHS, ROLES } from "./constants.js";
-import {
-  AuthProvider,
-  CatalogProvider,
-  ConfirmProvider,
-  ThemeProvider,
-  ToastProvider,
-  useAuth,
-} from "./context.jsx";
-import ProfilePage from "./features/account/ProfilePage.jsx";
-import AppointmentsPage from "./features/appointments/AppointmentsPage.jsx";
-import DoctorRegisterPage from "./features/auth/DoctorRegisterPage.jsx";
-import LoginPage from "./features/auth/LoginPage.jsx";
-import { ForgotPasswordPage, ResetPasswordPage } from "./features/auth/PasswordResetPages.jsx";
-import SignUpPage from "./features/auth/SignUpPage.jsx";
-import VerifyEmailPage from "./features/auth/VerifyEmailPage.jsx";
-import { BookingProvider } from "./features/booking/Booking.jsx";
-import DirectoryPage from "./features/discovery/DirectoryPage.jsx";
-import DiscoverPage from "./features/discovery/DiscoverPage.jsx";
-import DoctorProfilePage from "./features/discovery/DoctorProfilePage.jsx";
-import FacilitiesPage from "./features/discovery/FacilitiesPage.jsx";
-import MessagesPage from "./features/messaging/MessagesPage.jsx";
-import AssistancePage from "./features/support/AssistancePage.jsx";
-
-// ─── App ───────────────────────────────────────────────────────────────────────────────────
+import { AuthProvider } from "./context/AuthContext.jsx";
+import { BookingProvider } from "./context/BookingContext.jsx";
+import { CatalogProvider } from "./context/CatalogContext.jsx";
+import { ConfirmProvider } from "./context/ConfirmContext.jsx";
+import { ThemeProvider } from "./context/ThemeContext.jsx";
+import { ToastProvider } from "./context/ToastContext.jsx";
+import DoctorRegisterPage from "./pages/auth/DoctorRegisterPage.jsx";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage.jsx";
+import LoginPage from "./pages/auth/LoginPage.jsx";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage.jsx";
+import SignUpPage from "./pages/auth/SignUpPage.jsx";
+import VerifyEmailPage from "./pages/auth/VerifyEmailPage.jsx";
+import MessagesPage from "./pages/MessagesPage.jsx";
+import NotFoundPage from "./pages/NotFoundPage.jsx";
+import AppointmentsPage from "./pages/patient/AppointmentsPage.jsx";
+import ProfilePage from "./pages/patient/ProfilePage.jsx";
+import AssistancePage from "./pages/public/AssistancePage.jsx";
+import DirectoryPage from "./pages/public/DirectoryPage.jsx";
+import DiscoverPage from "./pages/public/DiscoverPage.jsx";
+import DoctorProfilePage from "./pages/public/DoctorProfilePage.jsx";
+import FacilitiesPage from "./pages/public/FacilitiesPage.jsx";
 
 // Role-restricted areas are split into separate bundles: patients never download them.
-const DoctorDashboardPage = lazy(() => import("./features/doctor-portal/DoctorDashboardPage.jsx"));
-const AdminOverviewPage = lazy(() => import("./features/admin/AdminOverviewPage.jsx"));
-const DoctorManagementPage = lazy(() => import("./features/admin/DoctorManagementPage.jsx"));
-const VerificationPage = lazy(() => import("./features/admin/VerificationPage.jsx"));
-const FacilityManagementPage = lazy(() => import("./features/admin/FacilityManagementPage.jsx"));
-const AppointmentManagementPage = lazy(() => import("./features/admin/AppointmentManagementPage.jsx"));
-const SpecialtiesPage = lazy(() => import("./features/admin/SpecialtiesPage.jsx"));
-const AdminAvailabilityPage = lazy(() =>
-  import("./features/availability/Availability.jsx").then((module) => ({
-    default: module.AdminAvailabilityPage,
-  })),
-);
-const SupportRequestsPage = lazy(() => import("./features/admin/SupportRequestsPage.jsx"));
-const DeactivationRequestsPage = lazy(() => import("./features/admin/DeactivationRequestsPage.jsx"));
+const DoctorDashboardPage = lazy(() => import("./pages/doctor/DoctorDashboardPage.jsx"));
+const AdminOverviewPage = lazy(() => import("./pages/admin/AdminOverviewPage.jsx"));
+const DoctorManagementPage = lazy(() => import("./pages/admin/DoctorManagementPage.jsx"));
+const VerificationPage = lazy(() => import("./pages/admin/VerificationPage.jsx"));
+const FacilityManagementPage = lazy(() => import("./pages/admin/FacilityManagementPage.jsx"));
+const AppointmentManagementPage = lazy(() => import("./pages/admin/AppointmentManagementPage.jsx"));
+const SpecialtiesPage = lazy(() => import("./pages/admin/SpecialtiesPage.jsx"));
+const AdminAvailabilityPage = lazy(() => import("./pages/admin/AdminAvailabilityPage.jsx"));
+const SupportRequestsPage = lazy(() => import("./pages/admin/SupportRequestsPage.jsx"));
+const DeactivationRequestsPage = lazy(() => import("./pages/admin/DeactivationRequestsPage.jsx"));
 
 /** The route table. Add new screens here. */
 export default function App() {
@@ -100,8 +93,6 @@ export default function App() {
   );
 }
 
-// ─── AppProviders ──────────────────────────────────────────────────────────────────────────
-
 /** Every app-wide provider, in dependency order. Must be rendered inside a Router. */
 export function AppProviders({ children }) {
   return (
@@ -117,50 +108,4 @@ export function AppProviders({ children }) {
       </ToastProvider>
     </ThemeProvider>
   );
-}
-
-// ─── NotFoundPage ──────────────────────────────────────────────────────────────────────────
-
-function NotFoundPage() {
-  return (
-    <EmptyState
-      title="Page not found"
-      description="The page you’re looking for doesn’t exist or has moved."
-      action={
-        <Link className="button button-primary" to={PATHS.discover}>
-          Back to home
-        </Link>
-      }
-    />
-  );
-}
-
-// ─── RequireRole ───────────────────────────────────────────────────────────────────────────
-
-const LOGIN_PATH = {
-  [ROLES.DOCTOR]: PATHS.doctorLogin,
-  [ROLES.ADMIN]: PATHS.adminLogin,
-};
-
-/**
- * Route guard. Renders nested routes only for the given role(s); otherwise it
- * redirects to a sign-in page and remembers where the visitor was going so they
- * return there afterwards. Patients must also have verified their email.
- *
- * This is a UX convenience. The API must enforce authorisation on every request.
- *
- * @param {{role?: string, roles?: string[]}} props  Allowed role(s).
- */
-function RequireRole({ role, roles = [role] }) {
-  const { user, isLoading } = useAuth();
-  const location = useLocation();
-
-  if (isLoading) return <PageLoader label="Checking your session…" />;
-  if (!user || !roles.includes(user.role)) {
-    const target = roles.length === 1 ? (LOGIN_PATH[roles[0]] ?? PATHS.login) : PATHS.login;
-    return <Navigate to={target} replace state={{ from: location, reason: "protected" }} />;
-  }
-  if (user.role === ROLES.PATIENT && !user.emailVerified)
-    return <Navigate to={PATHS.verifyEmail} replace state={{ from: location }} />;
-  return <Outlet />;
 }

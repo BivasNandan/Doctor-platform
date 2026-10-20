@@ -3,8 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import App, { AppProviders } from "./App.jsx";
-import { useResource } from "./hooks.js";
 import { DEMO_VERIFICATION_CODE } from "./constants.js";
+import { useResource } from "./hooks/useResource.js";
 
 vi.setConfig({ testTimeout: 20000 });
 

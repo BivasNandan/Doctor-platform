@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_VERIFICATION_CODE } from "../constants.js";
-import { localDateKey } from "../utils.js";
 import {
   adminService,
   appointmentService,
@@ -13,6 +12,7 @@ import {
   notificationService,
   slotService,
 } from "./demoBackend.js";
+import { localDateKey } from "../utils/dates.js";
 
 const daysFromNow = (days) => {
   const date = new Date();

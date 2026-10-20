@@ -1,7 +1,6 @@
-import { config } from "../constants.js";
-
 import * as api from "./api.js";
 import * as demo from "./demoBackend.js";
+import { config } from "../constants.js";
 
 /**
  * The service layer is the ONLY place that knows whether data comes from the

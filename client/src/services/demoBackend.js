@@ -15,7 +15,6 @@ import {
   SLOT_STATUS,
   VERIFICATION_STATUS,
 } from "../constants.js";
-import { clockLabelToMinutes, isValidEmail, isValidPhone, localDateKey, slugify } from "../utils.js";
 import {
   demoSlotTimes,
   doctors,
@@ -27,6 +26,9 @@ import {
   specialties,
 } from "./demoData.js";
 import { ApiError } from "./httpClient.js";
+import { clockLabelToMinutes, localDateKey } from "../utils/dates.js";
+import { slugify } from "../utils/format.js";
+import { isValidEmail, isValidPhone } from "../utils/validation.js";
 
 // ─── db ────────────────────────────────────────────────────────────────────────────────────
 
