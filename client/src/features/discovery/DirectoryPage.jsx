@@ -2,6 +2,7 @@ import { ArrowUpRight, MapPin, Search, ShieldCheck, SlidersHorizontal } from "lu
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button, SectionHeading } from "../../components/ui.jsx";
+import ScrollReveal from "../../components/ScrollReveal.jsx";
 import { useCatalog } from "../../context.jsx";
 import { useDebouncedValue, useResource } from "../../hooks.js";
 import { doctorService } from "../../services/index.js";
@@ -44,76 +45,80 @@ export default function DirectoryPage() {
         }
         description="Meet trusted specialists and find a time that works for you."
       />
-      <form
-        className="directory-search surface"
-        role="search"
-        onSubmit={(event) => {
-          event.preventDefault();
-          reload();
-        }}
-      >
-        <Search size={19} />
-        <input
-          aria-label="Search doctors"
-          placeholder="Doctor or specialty"
-          value={filters.query}
-          onChange={(event) => setFilter("query", event.target.value)}
-        />
-        <MapPin size={18} />
-        <input
-          aria-label="Search location"
-          placeholder="Area or city"
-          value={filters.location}
-          onChange={(event) => setFilter("location", event.target.value)}
-        />
-        <Button type="submit">
-          Search doctors <ArrowUpRight size={15} />
-        </Button>
-      </form>
-      <div className="directory-layout">
-        <DoctorFilters
-          filters={filters}
-          specialties={specialties}
-          setFilter={setFilter}
-          onClear={clearFilters}
-        />
-        <div className="directory-results">
-          <div className="results-toolbar">
-            <span>
-              <strong>{doctors?.length ?? 0}</strong> doctors found{" "}
-              <span className="location-crumb">
-                <MapPin size={13} /> {filters.location || "All locations"}
-              </span>
-            </span>
-            <label>
-              Sort by{" "}
-              <select value={sort} onChange={(event) => setSort(event.target.value)}>
-                {SORT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <DoctorGrid
-            doctors={doctors}
-            loading={loading}
-            error={error}
-            onRetry={reload}
-            onBook={openBooking}
-            className="directory-grid"
-            skeletons={4}
-            emptyTitle="No matching doctors yet"
-            emptyDescription="Try widening your filters or clearing a few selections."
-            emptyAction={
-              <Button variant="outline" onClick={clearFilters}>
-                Clear all filters
-              </Button>
-            }
+      <ScrollReveal>
+        <form
+          className="directory-search surface"
+          role="search"
+          onSubmit={(event) => {
+            event.preventDefault();
+            reload();
+          }}
+        >
+          <Search size={19} />
+          <input
+            aria-label="Search doctors"
+            placeholder="Doctor or specialty"
+            value={filters.query}
+            onChange={(event) => setFilter("query", event.target.value)}
           />
+          <MapPin size={18} />
+          <input
+            aria-label="Search location"
+            placeholder="Area or city"
+            value={filters.location}
+            onChange={(event) => setFilter("location", event.target.value)}
+          />
+          <Button type="submit">
+            Search doctors <ArrowUpRight size={15} />
+          </Button>
+        </form>
+      </ScrollReveal>
+      <ScrollReveal>
+        <div className="directory-layout">
+          <DoctorFilters
+            filters={filters}
+            specialties={specialties}
+            setFilter={setFilter}
+            onClear={clearFilters}
+          />
+          <div className="directory-results">
+            <div className="results-toolbar">
+              <span>
+                <strong>{doctors?.length ?? 0}</strong> doctors found{" "}
+                <span className="location-crumb">
+                  <MapPin size={13} /> {filters.location || "All locations"}
+                </span>
+              </span>
+              <label>
+                Sort by{" "}
+                <select value={sort} onChange={(event) => setSort(event.target.value)}>
+                  {SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <DoctorGrid
+              doctors={doctors}
+              loading={loading}
+              error={error}
+              onRetry={reload}
+              onBook={openBooking}
+              className="directory-grid"
+              skeletons={4}
+              emptyTitle="No matching doctors yet"
+              emptyDescription="Try widening your filters or clearing a few selections."
+              emptyAction={
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear all filters
+                </Button>
+              }
+            />
+          </div>
         </div>
-      </div>
+      </ScrollReveal>
     </>
   );
 }

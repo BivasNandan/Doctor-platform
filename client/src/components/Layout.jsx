@@ -28,7 +28,9 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { createPortal } from "react-dom";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Link, matchPath, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { isDemoMode, PATHS, ROLES } from "../constants.js";
 import { useAuth, useTheme, useToast } from "../context.jsx";
@@ -42,6 +44,7 @@ import { ErrorBoundary, IconButton, PageLoader } from "./ui.jsx";
 /** Chrome shared by every screen: sidebar, topbar, footer and mobile navigation. */
 export default function AppShell() {
   const { pathname } = useLocation();
+  const reduceMotion = useReducedMotion();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const main = useRef(null);
 
@@ -71,11 +74,18 @@ export default function AppShell() {
       <div className="main-column">
         <Topbar onOpenMenu={() => setDrawerOpen(true)} />
         <main className="page-content" id="main-content" ref={main} tabIndex={-1}>
-          <ErrorBoundary key={pathname}>
-            <Suspense fallback={<PageLoader />}>
-              <Outlet />
-            </Suspense>
-          </ErrorBoundary>
+          <motion.div
+            key={pathname}
+            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
+          >
+            <ErrorBoundary key={pathname}>
+              <Suspense fallback={<PageLoader />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
+          </motion.div>
         </main>
         <Footer />
       </div>
@@ -102,7 +112,7 @@ function Topbar({ onOpenMenu }) {
             </span>
             <span className="topbar-brand-copy">
               <strong>Carewell</strong>
-              <small>HEALTH PORTAL · {isDemoMode ? "SIMULATED DEMO" : "CONNECTED"}</small>
+              <small>HEALTH PORTAL</small>
             </span>
           </Link>
           <span className="brand-crumb">
@@ -291,23 +301,38 @@ function AccountMenu() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
+  const triggerRef = useRef(null);
+  const menuPanelRef = useRef(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const account = describeAccount(user);
+
+  const updateMenuPosition = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) setMenuPosition({ top: rect.bottom + 10, right: window.innerWidth - rect.right });
+  }, []);
 
   useEffect(() => {
     if (!open) return undefined;
     const closeOnOutsideClick = (event) => {
-      if (!menuRef.current?.contains(event.target)) setOpen(false);
+      if (!menuRef.current?.contains(event.target) && !menuPanelRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
     };
     const closeOnEscape = (event) => {
       if (event.key === "Escape") setOpen(false);
     };
+    const repositionMenu = () => updateMenuPosition();
     document.addEventListener("mousedown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", repositionMenu);
+    window.addEventListener("scroll", repositionMenu, true);
     return () => {
       document.removeEventListener("mousedown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", repositionMenu);
+      window.removeEventListener("scroll", repositionMenu, true);
     };
-  }, [open]);
+  }, [open, updateMenuPosition]);
 
   const goTo = (path) => {
     setOpen(false);
@@ -327,90 +352,102 @@ function AccountMenu() {
   return (
     <div className="account-menu-wrap" ref={menuRef}>
       <button
+        ref={triggerRef}
         className="account-trigger glass-pill"
         type="button"
         aria-label="Open account menu"
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (!open) updateMenuPosition();
+          setOpen((value) => !value);
+        }}
       >
         <UserRound size={18} />
         <ChevronDown size={13} />
       </button>
-      {open && (
-        <div className="account-menu surface" role="menu" aria-label="Account menu">
-          <div className="account-summary">
-            <span className="account-avatar" aria-hidden="true">
-              {initials(account.name)}
-            </span>
-            <span>
-              <strong>{account.name}</strong>
-              <small>{account.type}</small>
-            </span>
-          </div>
-          <div className="account-details">
-            <span>
-              {user
-                ? "Signed in to Carewell"
-                : isDemoMode
-                  ? "Demo mode · identity is not verified"
-                  : "Not signed in"}
-            </span>
-            {user?.accountStatus && <span>Account status: {user.accountStatus}</span>}
-          </div>
-          <div className="account-menu-divider" />
-          <button
-            role="menuitem"
-            className="account-menu-item"
-            type="button"
-            onClick={() => goTo(account.home)}
+      {open &&
+        createPortal(
+          <div
+            className="account-menu surface"
+            role="menu"
+            aria-label="Account menu"
+            ref={menuPanelRef}
+            style={{ top: menuPosition.top, right: menuPosition.right }}
           >
-            <UserRound size={15} />
-            <span>{account.homeLabel}</span>
-          </button>
-          {user?.role === ROLES.PATIENT && (
+            <div className="account-summary">
+              <span className="account-avatar" aria-hidden="true">
+                {initials(account.name)}
+              </span>
+              <span>
+                <strong>{account.name}</strong>
+                <small>{account.type}</small>
+              </span>
+            </div>
+            <div className="account-details">
+              <span>
+                {user
+                  ? "Signed in to Carewell"
+                  : isDemoMode
+                    ? "Demo mode · identity is not verified"
+                    : "Not signed in"}
+              </span>
+              {user?.accountStatus && <span>Account status: {user.accountStatus}</span>}
+            </div>
+            <div className="account-menu-divider" />
             <button
               role="menuitem"
               className="account-menu-item"
               type="button"
-              onClick={() => goTo(PATHS.profile)}
+              onClick={() => goTo(account.home)}
             >
               <UserRound size={15} />
-              <span>My profile</span>
+              <span>{account.homeLabel}</span>
             </button>
-          )}
-          <button
-            role="menuitem"
-            className="account-menu-item"
-            type="button"
-            onClick={() => goTo(PATHS.assistance)}
-          >
-            <ShieldCheck size={15} />
-            <span>Help &amp; support</span>
-          </button>
-          {user ? (
-            <button
-              role="menuitem"
-              className="account-menu-item account-menu-danger"
-              type="button"
-              onClick={signOut}
-            >
-              <LogOut size={15} />
-              <span>Sign out</span>
-            </button>
-          ) : (
+            {user?.role === ROLES.PATIENT && (
+              <button
+                role="menuitem"
+                className="account-menu-item"
+                type="button"
+                onClick={() => goTo(PATHS.profile)}
+              >
+                <UserRound size={15} />
+                <span>My profile</span>
+              </button>
+            )}
             <button
               role="menuitem"
               className="account-menu-item"
               type="button"
-              onClick={() => goTo(PATHS.signup)}
+              onClick={() => goTo(PATHS.assistance)}
             >
-              <UserRound size={15} />
-              <span>Create account</span>
+              <ShieldCheck size={15} />
+              <span>Help &amp; support</span>
             </button>
-          )}
-        </div>
-      )}
+            {user ? (
+              <button
+                role="menuitem"
+                className="account-menu-item account-menu-danger"
+                type="button"
+                onClick={signOut}
+              >
+                <LogOut size={15} />
+                <span>Sign out</span>
+              </button>
+            ) : (
+              <button
+                role="menuitem"
+                className="account-menu-item"
+                type="button"
+                onClick={() => goTo(PATHS.signup)}
+              >
+                <UserRound size={15} />
+                <span>Create account</span>
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -573,15 +610,32 @@ function QuickLink({ item }) {
 
 /** Bottom tab bar, visible on phones only (CSS controls visibility). */
 function MobileQuickNav() {
+  const { user } = useAuth();
+  const quickNav =
+    user?.role === ROLES.DOCTOR
+      ? [
+          QUICK_NAV[0],
+          QUICK_NAV[1],
+          { to: PATHS.doctorDashboard, label: "Practice", icon: LayoutDashboard },
+          QUICK_NAV[3],
+        ]
+      : user?.role === ROLES.ADMIN
+        ? [
+            QUICK_NAV[0],
+            QUICK_NAV[1],
+            { to: PATHS.admin, label: "Overview", icon: LayoutDashboard },
+            QUICK_NAV[3],
+          ]
+        : QUICK_NAV;
   return (
     <nav className="mobile-quick-nav glass-card-light" aria-label="Quick navigation">
-      {QUICK_NAV.slice(0, 2).map((item) => (
+      {quickNav.slice(0, 2).map((item) => (
         <QuickLink key={item.to} item={item} />
       ))}
       <NavLink to={PATHS.doctors} className="quick-nav-center" aria-label="Find a doctor">
         <Search size={21} />
       </NavLink>
-      {QUICK_NAV.slice(2).map((item) => (
+      {quickNav.slice(2).map((item) => (
         <QuickLink key={item.to} item={item} />
       ))}
     </nav>

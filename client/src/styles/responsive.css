@@ -155,27 +155,6 @@
   .hero-image-overlay {
     border-radius: 48% 48% 10px 10px;
   }
-  .note-top {
-    left: -13px;
-  }
-  .note-bottom {
-    right: -9px;
-    bottom: 18px;
-  }
-  .floating-note {
-    padding: 8px;
-    gap: 7px;
-  }
-  .floating-note strong {
-    font-size: 12px;
-  }
-  .floating-note small {
-    font-size: 12px;
-  }
-  .note-icon {
-    width: 28px;
-    height: 28px;
-  }
   .hero-caption {
     font-size: 12px;
   }
@@ -242,8 +221,13 @@
     align-items: flex-start;
   }
   .section-heading {
+    flex-wrap: wrap;
     align-items: flex-start;
     margin-bottom: 20px;
+  }
+  .section-heading > div {
+    min-width: 0;
+    flex: 1 1 100%;
   }
   .section-heading h1 {
     font-size: 37px;
@@ -454,7 +438,7 @@
   }
   .appointment-card {
     display: grid;
-    grid-template-columns: 43px 1fr auto;
+    grid-template-columns: 43px minmax(0, 1fr) auto;
     gap: 9px;
   }
   .appointment-date {
@@ -466,6 +450,11 @@
   }
   .appointment-detail {
     grid-column: 2;
+    min-width: 0;
+  }
+  .appointment-detail > span {
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
   }
   .appointment-card > .pill {
     grid-column: 3;
@@ -544,6 +533,14 @@
   .admin-shortcuts button {
     padding: 10px 7px;
     font-size: 12px;
+  }
+  .admin-shortcuts .admin-shortcut {
+    min-width: 0;
+    padding: 10px 8px;
+  }
+  .admin-shortcuts .admin-shortcut > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .form-grid {
     grid-template-columns: 1fr 1fr;
@@ -723,6 +720,38 @@
   }
   .mobile-drawer {
     padding: 20px;
+  }
+}
+@media (max-width: 480px) {
+  .signin-page {
+    width: 100%;
+  }
+  .signin-form {
+    padding: 16px;
+  }
+  .signin-form .form-actions > .button {
+    flex: 1 1 auto;
+  }
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-actions {
+    flex-wrap: wrap;
+  }
+  .section-heading > .button {
+    margin-left: auto;
+  }
+  .admin-shortcuts > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .chat-panel {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+  .chat-contact > i {
+    right: 3px;
+  }
+  .verification-card {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -936,4 +965,199 @@
 }
 :root[data-theme="dark"] .mobile-drawer {
   background: rgba(13, 43, 76, 0.58);
+}
+
+.account-menu,
+.notification-panel {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow:
+    0 18px 40px -28px rgba(32, 57, 87, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px) saturate(125%);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+}
+.account-menu {
+  position: fixed;
+  z-index: 1000;
+}
+:root[data-theme="dark"] .account-menu,
+:root[data-theme="dark"] .notification-panel {
+  border-color: rgba(190, 218, 245, 0.18);
+  background: rgba(13, 43, 76, 0.58);
+  box-shadow:
+    0 20px 40px -26px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(206, 231, 255, 0.1);
+}
+
+.glass-select {
+  position: relative;
+  min-width: 0;
+}
+.glass-select-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 13px;
+  color: var(--color-text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.34);
+  font: inherit;
+  text-align: left;
+  backdrop-filter: blur(16px) saturate(125%);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+}
+.glass-select-trigger:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+.glass-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.glass-select-placeholder {
+  color: var(--color-text-muted);
+}
+.glass-select-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  right: 0;
+  left: 0;
+  max-height: 250px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  color: var(--color-text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow:
+    0 18px 40px -28px rgba(32, 57, 87, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px) saturate(125%);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+}
+.glass-select-option {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 11px;
+  border-radius: 11px;
+  cursor: pointer;
+}
+.glass-select-option:hover,
+.glass-select-option.is-active {
+  background: rgba(255, 255, 255, 0.38);
+}
+:root[data-theme="dark"] .glass-select-trigger,
+:root[data-theme="dark"] .glass-select-menu {
+  border-color: rgba(190, 218, 245, 0.18);
+  background: rgba(13, 43, 76, 0.58);
+}
+:root[data-theme="dark"] .glass-select-menu {
+  box-shadow:
+    0 20px 40px -26px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(206, 231, 255, 0.1);
+}
+:root[data-theme="dark"] .glass-select-option:hover,
+:root[data-theme="dark"] .glass-select-option.is-active {
+  background: rgba(206, 231, 255, 0.12);
+}
+:root[data-theme="dark"] .glass-select-option[aria-selected="true"] {
+  color: #dbeafe;
+}
+:root[data-theme="dark"] .glass-select-trigger:disabled {
+  opacity: 0.65;
+}
+:root[data-theme="dark"] .glass-select-trigger {
+  background: rgba(13, 43, 76, 0.58);
+}
+
+/* Keep single-line form controls consistently pill-shaped across pages. */
+.field input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.field select,
+.form-grid input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.form-grid select,
+.inline-add-form input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.inline-add-form select,
+.patient-form-grid input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.patient-form-grid select,
+.filter-label input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.filter-label select,
+.results-toolbar select,
+.panel-heading select,
+.table-toolbar input,
+.drawer-search input,
+.chat-new select {
+  border-radius: 999px;
+}
+
+.field textarea,
+.form-grid textarea,
+.inline-add-form textarea,
+.patient-form-grid textarea,
+.filter-label textarea {
+  border-radius: 12px;
+}
+
+.form-grid input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.form-grid select {
+  height: 44px;
+  min-height: 44px;
+  padding-right: 12px;
+  padding-left: 12px;
+}
+.form-grid > .field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Form typography uses one readable scale, regardless of the page wrapper. */
+.field,
+.form-grid label,
+.inline-add-form label,
+.patient-form-grid label {
+  font-size: 13px;
+}
+.field input,
+.field select,
+.field textarea,
+.form-grid input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.form-grid select,
+.form-grid textarea,
+.inline-add-form input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.inline-add-form select,
+.inline-add-form textarea,
+.patient-form-grid input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.patient-form-grid select,
+.patient-form-grid textarea,
+.filter-label input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+.filter-label select,
+.filter-label textarea,
+.results-toolbar select,
+.panel-heading select,
+.facility-search input,
+.table-toolbar input,
+.message-compose input,
+.chat-new select {
+  font-size: 14px;
+}
+
+@media (max-width: 650px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not(
+      [type="button"]
+    ),
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }

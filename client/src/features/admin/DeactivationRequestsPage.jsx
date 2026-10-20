@@ -39,7 +39,11 @@ export default function DeactivationRequestsPage() {
     <>
       <SectionHeading
         eyebrow="DOCTOR ACCOUNT REVIEW"
-        title={<>Deactivation, reviewed with <em>care.</em></>}
+        title={
+          <>
+            Deactivation, reviewed with <em>care.</em>
+          </>
+        }
         description="Review each doctor’s request before changing access to their account and public profile."
       />
       <Tabs tabs={FILTERS} value={filter} onChange={setFilter} label="Filter deactivation requests" />
@@ -51,7 +55,11 @@ export default function DeactivationRequestsPage() {
         <EmptyState
           icon={CircleCheck}
           title={filter === "open" ? "You’re all caught up" : `No ${filter} requests`}
-          description={filter === "open" ? "There are no doctor account requests waiting for review." : "Requests with this decision will appear here."}
+          description={
+            filter === "open"
+              ? "There are no doctor account requests waiting for review."
+              : "Requests with this decision will appear here."
+          }
         />
       ) : (
         <div className="verification-list">

@@ -50,7 +50,9 @@ export default function SupportRequestCard({ request, onStatusChange, onReply })
         <div className="support-request-contact">
           {request.userName && <strong>{request.userName}</strong>}
           {request.email ? (
-            <a href={`mailto:${request.email}`}><Mail size={14} /> {request.email}</a>
+            <a href={`mailto:${request.email}`}>
+              <Mail size={14} /> {request.email}
+            </a>
           ) : (
             <span>No reply email provided</span>
           )}
@@ -82,7 +84,9 @@ export default function SupportRequestCard({ request, onStatusChange, onReply })
             <Field label="Email reply">
               <textarea name="message" required minLength={2} maxLength={4000} rows={4} disabled={busy} />
             </Field>
-            <Button type="submit" disabled={busy}>{busy ? "Sending…" : "Send reply"}</Button>
+            <Button type="submit" disabled={busy}>
+              {busy ? "Sending…" : "Send reply"}
+            </Button>
           </form>
         )}
       </div>

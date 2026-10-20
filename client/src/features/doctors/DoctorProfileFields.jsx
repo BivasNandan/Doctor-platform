@@ -1,3 +1,4 @@
+import GlassSelect from "../../components/GlassSelect.jsx";
 import { CheckboxGroup, Field } from "../../components/ui.jsx";
 import { joinList } from "../../utils.js";
 
@@ -10,7 +11,14 @@ import { joinList } from "../../utils.js";
  * @param {{doctor?: object, specialties: object[], facilities: object[],
  *   errors?: Record<string, string>, disabled?: boolean}} props
  */
-export default function DoctorProfileFields({ doctor, specialties, facilities, errors = {}, disabled }) {
+export default function DoctorProfileFields({
+  doctor,
+  specialties,
+  facilities,
+  errors = {},
+  disabled,
+  glassSpecialtySelect = false,
+}) {
   return (
     <>
       <Field label="Full name" error={errors.name}>
@@ -25,16 +33,26 @@ export default function DoctorProfileFields({ doctor, specialties, facilities, e
         />
       </Field>
       <Field label="Specialty" error={errors.specialtyId}>
-        <select name="specialtyId" required defaultValue={doctor?.specialtyId ?? ""} disabled={disabled}>
-          <option value="" disabled>
-            Choose a specialty
-          </option>
-          {specialties.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
+        {glassSpecialtySelect ? (
+          <GlassSelect
+            name="specialtyId"
+            options={specialties}
+            value={doctor?.specialtyId ?? ""}
+            placeholder="Choose a specialty"
+            disabled={disabled}
+          />
+        ) : (
+          <select name="specialtyId" required defaultValue={doctor?.specialtyId ?? ""} disabled={disabled}>
+            <option value="" disabled>
+              Choose a specialty
             </option>
-          ))}
-        </select>
+            {specialties.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        )}
       </Field>
       <Field label="Qualifications (comma separated)" error={errors.qualifications}>
         <input

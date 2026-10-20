@@ -1,4 +1,5 @@
 import { ArrowRight, ArrowUpRight, Check, Clock3, MapPin } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
   Avatar,
@@ -15,10 +16,21 @@ import { formatFee } from "../../utils.js";
 // ─── DoctorCard ────────────────────────────────────────────────────────────────────────────
 
 /** Summary card for one doctor in a grid. `onBook` receives the doctor. */
-function DoctorCard({ doctor, onBook }) {
+function DoctorCard({ doctor, onBook, index }) {
+  const reduceMotion = useReducedMotion();
   const verified = doctor.verificationStatus === VERIFICATION_STATUS.VERIFIED;
   return (
-    <article className="doctor-card surface">
+    <motion.article
+      className="doctor-card surface"
+      initial={reduceMotion ? false : { opacity: 0, y: 7 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.15 }}
+      transition={{
+        duration: reduceMotion ? 0 : 0.22,
+        delay: reduceMotion ? 0 : Math.min(index * 0.04, 0.12),
+        ease: "easeOut",
+      }}
+    >
       <div className="doctor-photo">
         <Avatar src={doctor.image} name={doctor.name} alt={doctor.name} />
         <span className="availability">
@@ -63,7 +75,7 @@ function DoctorCard({ doctor, onBook }) {
           </Button>
         </div>
       </div>
-    </article>
+    </motion.article>
   );
 }
 
@@ -93,8 +105,8 @@ export function DoctorGrid({
     return <EmptyState title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   return (
     <div className={`doctor-grid ${className}`.trim()} aria-busy={loading}>
-      {doctors.map((doctor) => (
-        <DoctorCard key={doctor.id} doctor={doctor} onBook={onBook} />
+      {doctors.map((doctor, index) => (
+        <DoctorCard key={doctor.id} doctor={doctor} onBook={onBook} index={index} />
       ))}
     </div>
   );

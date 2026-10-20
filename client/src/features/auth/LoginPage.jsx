@@ -79,7 +79,7 @@ export default function LoginPage({ portal }) {
         : "");
 
   return (
-    <>
+    <div className="signin-page">
       <SectionHeading
         eyebrow={portal === ROLES.PATIENT ? "WELCOME BACK" : "CAREWELL PORTAL"}
         title={config.title}
@@ -89,7 +89,7 @@ export default function LoginPage({ portal }) {
             : "Your account is authenticated by the Carewell service."
         }
       />
-      <form className="admin-form surface" onSubmit={submit}>
+      <form className="admin-form surface signin-form" onSubmit={submit}>
         <Notice>{prompt}</Notice>
         <div className="form-grid">
           <Field label="Email">
@@ -126,6 +126,6 @@ export default function LoginPage({ portal }) {
           </Button>
         </div>
       </form>
-    </>
+    </div>
   );
 }

@@ -1172,7 +1172,8 @@ export const adminService = {
     if (!["approve", "decline"].includes(decision)) throw invalid("Choose approve or decline.");
     const request = db.deactivationRequests.find((item) => item.id === id);
     if (!request) throw notFound("This deactivation request");
-    if (request.status !== "open") throw conflict("This request has already been decided.", "ALREADY_DECIDED");
+    if (request.status !== "open")
+      throw conflict("This request has already been decided.", "ALREADY_DECIDED");
     request.status = decision === "approve" ? "approved" : "declined";
     request.decidedAt = new Date().toISOString();
     const doctor = requireDoctor(request.doctorId);

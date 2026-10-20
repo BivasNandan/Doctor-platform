@@ -99,7 +99,7 @@ export function FacilityImage({ src, alt = "", ...props }) {
  */
 export function Field({ label, hint, error, className, children }) {
   return (
-    <label className={className}>
+    <label className={["field", className].filter(Boolean).join(" ")}>
       {label}
       {children}
       {hint && <small className="field-hint">{hint}</small>}

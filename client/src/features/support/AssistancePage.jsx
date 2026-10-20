@@ -31,7 +31,7 @@ export default function AssistancePage() {
       await supportService.submit({ message: message.trim(), email: email.trim() });
       setMessage("");
       setEmail(user?.email ?? "");
-      setStatus({ state: "sent", error: "" });
+      setStatus({ state: "sent", error: "", replyEmail: Boolean(email.trim()) });
     } catch (error) {
       setStatus({ state: "idle", error: error.message || "Your message could not be sent." });
     }
@@ -57,7 +57,10 @@ export default function AssistancePage() {
           <h3>Let’s figure it out together.</h3>
           <p>Tell us what’s on your mind. Our patient support team is available every day, 8am–10pm.</p>
           <form onSubmit={submit}>
-            <Field label="Email for our reply" hint="Optional. Add an address if you’d like us to follow up.">
+            <Field
+              label="Email for our reply"
+              hint="Optional. We can only reply if you provide an email address."
+            >
               <input
                 name="email"
                 type="email"
@@ -85,7 +88,9 @@ export default function AssistancePage() {
                 <CheckCircle2 size={14} />
                 {isDemoMode
                   ? "Demo mode: your message was not delivered to anyone."
-                  : "We’ll be in touch shortly."}
+                  : status.replyEmail
+                    ? "Your message was received. We’ll be in touch shortly."
+                    : "Your message was received. Add an email address if you’d like a reply."}
               </span>
             )}
           </form>

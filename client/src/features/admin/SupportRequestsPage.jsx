@@ -51,7 +51,11 @@ export default function SupportRequestsPage() {
     <>
       <SectionHeading
         eyebrow="A HUMAN RESPONSE, WHEN IT MATTERS"
-        title={<>Support, handled with <em>care.</em></>}
+        title={
+          <>
+            Support, handled with <em>care.</em>
+          </>
+        }
         description="Review incoming questions, keep their status up to date, and reply by email."
       />
       <Tabs tabs={FILTERS} value={filter} onChange={setFilter} label="Filter support requests" />

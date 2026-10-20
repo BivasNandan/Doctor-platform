@@ -4,9 +4,11 @@ import {
   CalendarDays,
   Clock3,
   Hospital,
+  LifeBuoy,
   ListFilter,
   ShieldCheck,
   Stethoscope,
+  UserRound,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ErrorState, PageLoader, Pill, SectionHeading } from "../../components/ui.jsx";
@@ -21,6 +23,8 @@ const SHORTCUTS = [
   [PATHS.adminAppointments, "Appointment management", CalendarDays],
   [PATHS.adminSpecialties, "Manage specialties", ListFilter],
   [PATHS.adminAvailability, "Update availability", Clock3],
+  [PATHS.adminSupport, "Support requests", LifeBuoy],
+  [PATHS.adminDeactivationRequests, "Deactivation review", UserRound],
 ];
 
 const monthInitial = (month) =>

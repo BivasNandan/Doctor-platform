@@ -2,6 +2,7 @@ import { MapPin, Search } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { EmptyState, ErrorState, PageLoader, SectionHeading } from "../../components/ui.jsx";
+import ScrollReveal from "../../components/ScrollReveal.jsx";
 import { doctorsSearchPath, PATHS } from "../../constants.js";
 import { useCatalog } from "../../context.jsx";
 import { useResource } from "../../hooks.js";
@@ -81,22 +82,24 @@ export default function FacilitiesPage() {
         ))}
         <span>Showing {visible.length} places</span>
       </div>
-      {loading && !facilities.length ? (
-        <PageLoader />
-      ) : error && !facilities.length ? (
-        <ErrorState error={error} onRetry={reload} />
-      ) : (
-        <div className={`facility-grid ${view === "map" ? "facility-map-layout" : ""}`}>
-          {visible.map((facility) => (
-            <FacilityCard
-              key={facility.id}
-              facility={facility}
-              doctors={doctors.filter((doctor) => doctor.facilityIds.includes(facility.id))}
-              onViewDoctors={() => navigate(doctorsSearchPath({ location: facility.name }))}
-            />
-          ))}
-        </div>
-      )}
+      <ScrollReveal>
+        {loading && !facilities.length ? (
+          <PageLoader />
+        ) : error && !facilities.length ? (
+          <ErrorState error={error} onRetry={reload} />
+        ) : (
+          <div className={`facility-grid ${view === "map" ? "facility-map-layout" : ""}`}>
+            {visible.map((facility) => (
+              <FacilityCard
+                key={facility.id}
+                facility={facility}
+                doctors={doctors.filter((doctor) => doctor.facilityIds.includes(facility.id))}
+                onViewDoctors={() => navigate(doctorsSearchPath({ location: facility.name }))}
+              />
+            ))}
+          </div>
+        )}
+      </ScrollReveal>
       {!loading && !error && visible.length === 0 && (
         <EmptyState
           title="No places found"

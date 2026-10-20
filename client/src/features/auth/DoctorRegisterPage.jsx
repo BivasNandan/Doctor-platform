@@ -69,7 +69,12 @@ export default function DoctorRegisterPage() {
           <Field label="Phone" error={errors.phone}>
             <input name="phone" type="tel" required pattern={PHONE_PATTERN} autoComplete="tel" />
           </Field>
-          <DoctorProfileFields specialties={specialties} facilities={facilities} errors={errors} />
+          <DoctorProfileFields
+            specialties={specialties}
+            facilities={facilities}
+            errors={errors}
+            glassSpecialtySelect
+          />
         </div>
         <Notice error>{formError}</Notice>
         <div className="form-actions">

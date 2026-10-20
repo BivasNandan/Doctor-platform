@@ -932,7 +932,6 @@ a {
   min-height: calc(100vh - 110px);
   margin: 0 auto;
   padding: 36px 42px 60px;
-  animation: page-in 0.35s ease both;
 }
 @keyframes page-in {
   from {

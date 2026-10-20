@@ -253,77 +253,6 @@
   background: linear-gradient(180deg, rgba(11, 31, 51, 0.02) 47%, rgba(11, 31, 51, 0.28));
   pointer-events: none;
 }
-.floating-note {
-  position: absolute;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  border: 1px solid var(--color-glass-border);
-  border-radius: 10px;
-  background: var(--color-glass-bg-strong);
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(18px);
-  animation: note-float 6s ease-in-out infinite;
-}
-@keyframes note-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-.note-top {
-  top: 22%;
-  left: -34px;
-}
-.note-bottom {
-  right: -22px;
-  bottom: 20px;
-  animation-delay: -2s;
-}
-.note-icon {
-  display: grid;
-  place-items: center;
-  width: 31px;
-  height: 31px;
-  color: var(--color-brand-secondary);
-  background: var(--color-verified-bg);
-  border-radius: 9px;
-}
-.floating-note > span:nth-child(2) {
-  display: grid;
-  line-height: 1.35;
-}
-.floating-note strong {
-  font-size: 13px;
-}
-.floating-note small {
-  color: var(--color-text-tertiary);
-  font-size: 12px;
-}
-.note-check {
-  display: grid;
-  place-items: center;
-  width: 21px;
-  height: 21px;
-  margin-left: 8px;
-  color: var(--color-success);
-  background: var(--color-success-bg);
-  border-radius: 50%;
-}
-.note-bottom > img {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  border-radius: 50%;
-}
-.note-rating {
-  margin-left: 8px;
-}
 .image-stamp {
   position: absolute;
   left: 16px;
@@ -2003,6 +1932,33 @@ td {
   margin: -8px 0 15px;
   padding: 15px;
   border-radius: 10px;
+}
+.signin-page {
+  width: min(100%, 620px);
+  margin: 0 auto;
+}
+.signin-form {
+  width: 100%;
+  margin: 0;
+  padding: 22px;
+}
+.signin-form .form-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+.signin-form .form-grid input {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+.signin-form .form-actions {
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 14px;
+}
+.signin-form .form-actions > .button {
+  min-height: 40px;
 }
 .form-grid {
   display: grid;

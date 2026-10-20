@@ -1,17 +1,8 @@
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Check,
-  ChevronDown,
-  MapPin,
-  Search,
-  ShieldCheck,
-  Sparkles,
-  Stethoscope,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight, ChevronDown, MapPin, Search, Sparkles, Stethoscope } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Avatar, Button } from "../../components/ui.jsx";
+import { Button } from "../../components/ui.jsx";
+import ScrollReveal from "../../components/ScrollReveal.jsx";
 import { doctorsSearchPath, PATHS } from "../../constants.js";
 import { useCatalog } from "../../context.jsx";
 import { useResource } from "../../hooks.js";
@@ -28,45 +19,57 @@ export default function DiscoverPage() {
 
   return (
     <>
-      <HeroSection doctor={doctors?.[0]} />
-      <DiscoverSearch />
-      <TrustStrip />
-      <section className="featured-section">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">A GOOD PLACE TO BEGIN</span>
-            <h2>
-              Doctors patients <em>love.</em>
-            </h2>
-            <p>A few of the kind, skilled people making a difference in Dhaka.</p>
-          </div>
-          <Link className="text-link" to={PATHS.doctors}>
-            Explore all doctors <ArrowUpRight size={15} />
-          </Link>
-        </div>
-        <DoctorGrid
-          doctors={featured}
-          loading={loading}
-          error={error}
-          onRetry={reload}
-          onBook={openBooking}
-          emptyAction={
-            <Link className="button button-primary" to={PATHS.doctors}>
-              Browse all doctors
+      <ScrollReveal>
+        <HeroSection />
+      </ScrollReveal>
+      <ScrollReveal>
+        <DiscoverSearch />
+      </ScrollReveal>
+      <ScrollReveal>
+        <TrustStrip />
+      </ScrollReveal>
+      <ScrollReveal>
+        <section className="featured-section">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">A GOOD PLACE TO BEGIN</span>
+              <h2>
+                Doctors patients <em>love.</em>
+              </h2>
+              <p>A few of the kind, skilled people making a difference in Dhaka.</p>
+            </div>
+            <Link className="text-link" to={PATHS.doctors}>
+              Explore all doctors <ArrowUpRight size={15} />
             </Link>
-          }
-        />
-        <div className="doctor-bottom">
-          <span>
-            <i /> Platform verified professionals
-          </span>
-          <Link className="text-link" to={PATHS.doctors}>
-            See all specialists <ArrowRight size={15} />
-          </Link>
-        </div>
-      </section>
-      <CareBanner />
-      <Testimonial />
+          </div>
+          <DoctorGrid
+            doctors={featured}
+            loading={loading}
+            error={error}
+            onRetry={reload}
+            onBook={openBooking}
+            emptyAction={
+              <Link className="button button-primary" to={PATHS.doctors}>
+                Browse all doctors
+              </Link>
+            }
+          />
+          <div className="doctor-bottom">
+            <span>
+              <i /> Platform verified professionals
+            </span>
+            <Link className="text-link" to={PATHS.doctors}>
+              See all specialists <ArrowRight size={15} />
+            </Link>
+          </div>
+        </section>
+      </ScrollReveal>
+      <ScrollReveal>
+        <CareBanner />
+      </ScrollReveal>
+      <ScrollReveal>
+        <Testimonial />
+      </ScrollReveal>
     </>
   );
 }
@@ -74,7 +77,7 @@ export default function DiscoverPage() {
 // ─── HeroSection ───────────────────────────────────────────────────────────────────────────
 
 /** Home-page hero. `doctor` is the profile highlighted in the floating card. */
-function HeroSection({ doctor }) {
+function HeroSection() {
   return (
     <section className="hero">
       <div className="hero-copy">
@@ -113,29 +116,6 @@ function HeroSection({ doctor }) {
         <div className="hero-image-wrap">
           <img className="hero-image" src={HERO_IMAGE} alt="Doctor in a calm, welcoming clinic" />
           <div className="hero-image-overlay" />
-          <div className="floating-note note-top">
-            <span className="note-icon">
-              <ShieldCheck size={18} />
-            </span>
-            <span>
-              <strong>Care you can trust</strong>
-              <small>Doctors, thoughtfully verified</small>
-            </span>
-            <span className="note-check">
-              <Check size={15} />
-            </span>
-          </div>
-          {doctor && (
-            <div className="floating-note note-bottom">
-              <Avatar src={doctor.image} name={doctor.name} />
-              <span>
-                <strong>{doctor.name}</strong>
-                <small>
-                  {doctor.specialty} · {doctor.experienceYears} years
-                </small>
-              </span>
-            </div>
-          )}
           <span className="image-stamp">CW—01</span>
         </div>
         <div className="hero-caption">
