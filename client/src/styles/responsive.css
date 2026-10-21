@@ -206,16 +206,16 @@
     border-bottom: 1px solid var(--color-border-default);
   }
   .trust-headline {
-    font-size: 18px;
+    font-size: 20px;
   }
   .trust-stat {
     padding-left: 10px;
   }
   .trust-stat strong {
-    font-size: 25px;
+    font-size: 18px;
   }
   .trust-stat small {
-    font-size: 12px;
+    font-size: 13px;
   }
   .featured-section .section-heading {
     align-items: flex-start;

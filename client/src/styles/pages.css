@@ -425,11 +425,15 @@
   border-radius: 12px;
   background: var(--gradient-ambient);
 }
+.trust-strip .eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
 .trust-headline {
   display: block;
   margin-top: 5px;
-  font: 700 19px/1.36 var(--font-display);
-  letter-spacing: -0.6px;
+  font: 700 22px/1.25 var(--font-display);
+  letter-spacing: -0.65px;
 }
 .trust-headline em {
   color: var(--color-brand-secondary);
@@ -441,16 +445,17 @@
   border-left: 1px solid var(--color-border-default);
 }
 .trust-stat strong {
-  font: 700 29px var(--font-display);
-  letter-spacing: -1.3px;
+  font: 700 20px/1.25 var(--font-display);
+  letter-spacing: -0.45px;
 }
 .trust-stat strong span {
   color: var(--color-brand-secondary);
-  font-size: 18px;
+  font-size: 14px;
 }
 .trust-stat small {
   color: var(--color-text-tertiary);
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 1.45;
 }
 .trust-note {
   display: flex;
