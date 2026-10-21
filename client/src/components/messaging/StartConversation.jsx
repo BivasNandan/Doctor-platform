@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DoctorPicker from "./DoctorPicker.jsx";
 import { useResource } from "../../hooks/useResource.js";
 import { adminService } from "../../services/index.js";
 
@@ -13,14 +14,7 @@ export default function StartConversation({ onStart }) {
       <label htmlFor="chat-new-doctor">
         <small>Message a doctor</small>
       </label>
-      <select id="chat-new-doctor" value={doctorId} onChange={(event) => setDoctorId(event.target.value)}>
-        <option value="">Choose a doctor…</option>
-        {list.map((doctor) => (
-          <option key={doctor.id} value={doctor.id}>
-            {doctor.name}
-          </option>
-        ))}
-      </select>
+      <DoctorPicker doctors={list} value={doctorId} onChange={setDoctorId} />
       <button
         type="button"
         className="button button-outline"
