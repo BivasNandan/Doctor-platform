@@ -7,6 +7,7 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { BookingProvider } from "./context/BookingContext.jsx";
 import { CatalogProvider } from "./context/CatalogContext.jsx";
 import { ConfirmProvider } from "./context/ConfirmContext.jsx";
+import { RealtimeProvider } from "./context/RealtimeContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { ToastProvider } from "./context/ToastContext.jsx";
 import DoctorRegisterPage from "./pages/auth/DoctorRegisterPage.jsx";
@@ -32,6 +33,8 @@ const DoctorManagementPage = lazy(() => import("./pages/admin/DoctorManagementPa
 const VerificationPage = lazy(() => import("./pages/admin/VerificationPage.jsx"));
 const FacilityManagementPage = lazy(() => import("./pages/admin/FacilityManagementPage.jsx"));
 const AppointmentManagementPage = lazy(() => import("./pages/admin/AppointmentManagementPage.jsx"));
+const PatientManagementPage = lazy(() => import("./pages/admin/PatientManagementPage.jsx"));
+const ReviewModerationPage = lazy(() => import("./pages/admin/ReviewModerationPage.jsx"));
 const SpecialtiesPage = lazy(() => import("./pages/admin/SpecialtiesPage.jsx"));
 const AdminAvailabilityPage = lazy(() => import("./pages/admin/AdminAvailabilityPage.jsx"));
 const SupportRequestsPage = lazy(() => import("./pages/admin/SupportRequestsPage.jsx"));
@@ -81,6 +84,8 @@ export default function App() {
           <Route path={PATHS.adminVerification} element={<VerificationPage />} />
           <Route path={PATHS.adminFacilities} element={<FacilityManagementPage />} />
           <Route path={PATHS.adminAppointments} element={<AppointmentManagementPage />} />
+          <Route path={PATHS.adminPatients} element={<PatientManagementPage />} />
+          <Route path={PATHS.adminReviews} element={<ReviewModerationPage />} />
           <Route path={PATHS.adminSpecialties} element={<SpecialtiesPage />} />
           <Route path={PATHS.adminAvailability} element={<AdminAvailabilityPage />} />
           <Route path={PATHS.adminSupport} element={<SupportRequestsPage />} />
@@ -100,9 +105,11 @@ export function AppProviders({ children }) {
       <ToastProvider>
         <ConfirmProvider>
           <AuthProvider>
-            <CatalogProvider>
-              <BookingProvider>{children}</BookingProvider>
-            </CatalogProvider>
+            <RealtimeProvider>
+              <CatalogProvider>
+                <BookingProvider>{children}</BookingProvider>
+              </CatalogProvider>
+            </RealtimeProvider>
           </AuthProvider>
         </ConfirmProvider>
       </ToastProvider>

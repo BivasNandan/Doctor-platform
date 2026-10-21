@@ -292,6 +292,8 @@ describe("doctors", () => {
         facilityIds: [clinicA.id],
         nextAvailable: "To be scheduled",
         availability: [],
+        rating: 0,
+        reviewCount: 0,
       },
     );
   });

@@ -174,6 +174,8 @@ export const PATHS = Object.freeze({
   adminVerification: "/admin/verification",
   adminFacilities: "/admin/facilities",
   adminAppointments: "/admin/appointments",
+  adminPatients: "/admin/patients",
+  adminReviews: "/admin/reviews",
   adminSpecialties: "/admin/specialties",
   adminAvailability: "/admin/availability",
   adminSupport: "/admin/support",

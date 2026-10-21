@@ -1,9 +1,11 @@
+import { assetUrl } from "../../utils/assets.js";
+
 export const TESTIMONIAL = {
   quote:
     "For the first time, finding a doctor felt simple. I booked in a few minutes and Dr. Nusrat made me feel completely at ease.",
   author: "Demo patient",
   detail: "Carewell patient · Dhaka",
-  avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&h=80&fit=crop&crop=faces",
+  avatar: "images/people/patient-4.jpg",
 };
 
 export default function Testimonial() {
@@ -17,7 +19,7 @@ export default function Testimonial() {
       </h2>
       <blockquote>“{TESTIMONIAL.quote}”</blockquote>
       <div className="quote-author">
-        <img src={TESTIMONIAL.avatar} alt="" loading="lazy" />
+        <img src={assetUrl(TESTIMONIAL.avatar)} alt="" loading="lazy" />
         <span>
           <strong>{TESTIMONIAL.author}</strong>
           <small>{TESTIMONIAL.detail}</small>

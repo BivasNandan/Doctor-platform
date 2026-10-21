@@ -20,7 +20,7 @@ _Backend dependency_.
 | FR-43–52 Doctor registration, sign-in, own profile (review flag), deactivation request, blocked accounts | `pages/auth/DoctorRegisterPage.jsx`, `pages/doctor/*`, `components/doctors/DoctorProfileFields.jsx` | Account lifecycle, email verification, review workflow |
 | FR-53–60 Doctor requests, accept/reject, availability | `pages/doctor/DoctorDashboardPage.jsx` (requests tab), `components/availability/AvailabilityManager.jsx` | Ownership, transition authority, history |
 | FR-61, FR-64–71 Messaging: eligibility, history, compose, attachments, receipts/presence | `pages/MessagesPage.jsx`, `components/messaging/*`, `utils/validation.js` | Eligibility enforcement, storage + scanning, read/presence data |
-| FR-62 Real-time messaging | – (not simulated) | WebSocket/SSE transport and reconnect handling |
+| FR-62 Real-time messaging | – (not simulated; the demo has no server to push) | Done in API mode with Server-Sent Events (`GET /events`), automatic reconnect and a polling fallback |
 | NFR-01–13, 18–22 Validation, errors, privacy, security, performance | Input checks, error/loading/empty states, `ApiError`, no secrets in client | HTTPS, authoritative validation, rate limiting, backups, retention |
 | NFR-14–17, 23–35 Accessibility, responsiveness, maintainability | Semantic controls, labelled fields, focus-managed dialogs, route-level code splitting, ESLint a11y rules, docs | Manual keyboard / screen-reader / device review still recommended |
 

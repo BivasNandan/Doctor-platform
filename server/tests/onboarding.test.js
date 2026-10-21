@@ -84,20 +84,18 @@ describe("doctor self-registration", () => {
 
   it("reports every invalid field", async () => {
     const body = fails(
-      await ctx
-        .client()
-        .post("/auth/doctor/register", {
-          name: "D",
-          email: "nope",
-          phone: "1",
-          password: "short",
-          specialtyId: "",
-          qualifications: [],
-          experienceYears: -1,
-          fee: -5,
-          location: "",
-          facilityIds: [],
-        }),
+      await ctx.client().post("/auth/doctor/register", {
+        name: "D",
+        email: "nope",
+        phone: "1",
+        password: "short",
+        specialtyId: "",
+        qualifications: [],
+        experienceYears: -1,
+        fee: -5,
+        location: "",
+        facilityIds: [],
+      }),
       422,
       "VALIDATION_FAILED",
     );

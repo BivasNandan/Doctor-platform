@@ -1,5 +1,6 @@
 import { Check, Save } from "lucide-react";
 import { useState } from "react";
+import ProfilePhotoEditor from "../../components/account/ProfilePhotoEditor.jsx";
 import ChangePasswordForm from "../../components/patient/ChangePasswordForm.jsx";
 import { Button, Field, Notice, Pill, SectionHeading } from "../../components/ui/index.js";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -47,6 +48,9 @@ export default function ProfilePage() {
         }
         description="These details pre-fill your appointment requests. You can change them for each booking."
       />
+      <div className="admin-form surface">
+        <ProfilePhotoEditor />
+      </div>
       <form className="admin-form surface" onSubmit={submit} noValidate>
         <div className="form-grid">
           <Field label="Full name" error={errors.name}>

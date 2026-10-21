@@ -17,7 +17,7 @@ export default function Sidebar() {
       <Brand />
       <div className="workspace-switch">
         <span className="workspace-mark" aria-hidden="true">
-          {initials(account.name)}
+          {user?.photoUrl ? <img src={user.photoUrl} alt="" /> : initials(account.name)}
         </span>
         <span>
           <strong>{account.name}</strong>

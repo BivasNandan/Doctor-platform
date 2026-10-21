@@ -30,7 +30,7 @@ User ──1:0..1── Doctor ──N:1── Specialty
   │
   └── Conversation (patient + doctor, or doctor + admin) ──1:N── Message ──1:N── MessageAttachment
 
-Doctor ──1:N── DoctorCertificate · DeactivationRequest
+Doctor ──1:N── DoctorCertificate · DeactivationRequest · Review ──N:1── User (patient)
 ```
 
 | Relationship | Delete behaviour | Why |
@@ -43,6 +43,7 @@ Doctor ──1:N── DoctorCertificate · DeactivationRequest
 | DoctorClinic → Slot | **no action** | A clinic link cannot be removed while the doctor still has slots there. |
 | Clinic → anything | **restrict** | Deactivate clinics (`active = false`) instead of deleting. |
 | Conversation → Message → Attachment | cascade | Owned data. |
+| Doctor / patient → Review | cascade | A review belongs to the visit's patient and doctor; deleting an account removes its reviews. |
 | User → Session / codes / tokens | cascade | Owned data. |
 | Actor / decider on AuditLog, DeactivationRequest, SupportRequest | set null | Keep the record if the user is removed. |
 
@@ -70,6 +71,7 @@ Written as SQL in the migration, because Prisma cannot express them in the schem
 | A patient thread has a patient; the admin thread has none; one admin thread per doctor | check + partial unique index | `409` |
 | One thread per patient and doctor | unique `(doctorId, patientId)` | handled by "find or create" |
 | Message ≤ 2000 characters, attachment ≤ 10 MB | checks | `422` |
+| Review rating 1–5, comment ≤ 1000 characters, one review per patient and doctor | checks + unique `(patientId, doctorId)` | `422` / `409 ALREADY_REVIEWED` |
 
 When one of these fires, catch the Prisma error (`P2002` unique, `P2003` foreign key, or a raw constraint name from the
 error message) and translate it to the API error above.
@@ -99,6 +101,9 @@ error message) and translate it to the API error above.
 | `message.sender`, `isMine` | `message.sender.role`, `senderId = current user` | |
 | `message.sentAt`, `readAt` | `createdAt`, `readAt` | |
 | `attachmentUrl` | signed URL built from `message_attachments.storageKey` | Bucket is private. |
+| `user.photoUrl` | `users.photoKey` (storage key) + `users.photoUpdatedAt` | URL is built as `/api/v1/photos/users/<id>?v=<photoUpdatedAt>`; the file is in the private bucket. |
+| `doctor.rating`, `doctor.reviewCount` | `AVG(reviews.rating)` / `COUNT(*)` over `reviews` where `status = visible` | Computed per request; 0 when there are none. |
+| `review.*` | `reviews` (`rating`, `comment`, `status` visible\|hidden) | `author` is shown as the patient's first name and last initial. |
 | `adminSummary.*` | counts and a monthly `GROUP BY` | No table needed. |
 
 ## Working with the schema

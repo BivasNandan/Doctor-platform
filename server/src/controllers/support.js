@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { notifyAdmins, preview } from "../services/notifications.js";
+import { env } from "../config/env.js";
+import { sendSupportRequestEmail } from "../services/mail.js";
+import { LINKS, notifyAdmins, preview } from "../services/notifications.js";
 import { parse } from "../utils/errors.js";
 
 /** The "Assistance" form: anyone can write to the Carewell team, signed in or not. */
@@ -39,11 +41,22 @@ export const createSupportRequest = async (request, response) => {
       email: email ?? request.user?.email,
     },
   });
+  // The message also lands in the Carewell inbox, so the team sees it without opening the admin area.
+  if (env.supportEmail)
+    void sendSupportRequestEmail({
+      to: env.supportEmail,
+      replyTo: created.email ?? undefined,
+      name: request.user?.name,
+      email: created.email,
+      message,
+      id: created.id,
+      signedIn: Boolean(request.user),
+    });
   await notifyAdmins({
     kind: "support",
     title: "New support request",
     body: preview(message),
-    link: "/admin",
+    link: LINKS.adminSupport,
   });
   response.status(201).json({ id: created.id, status: created.status });
 };

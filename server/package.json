@@ -10,7 +10,9 @@
     "dev": "node --watch src/server.js",
     "verify:services": "node scripts/verify-services.js",
     "seed": "node scripts/seed.js",
-    "test": "node --test --test-concurrency=1 \"tests/*.test.js\""
+    "test": "node --test --test-concurrency=1 \"tests/*.test.js\"",
+    "seed:demo": "node scripts/seed-demo.js",
+    "seed:images": "node scripts/apply-images.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.840.0",

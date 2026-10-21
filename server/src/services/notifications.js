@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { publish } from "./realtime.js";
 
 /**
  * In-app notifications: one line in somebody's bell menu. Routes call `notify` after something
@@ -13,6 +14,8 @@ export const LINKS = {
   profile: "/profile",
   doctorDashboard: "/doctor/dashboard",
   adminDoctors: "/admin/doctors",
+  adminSupport: "/admin/support",
+  adminDeactivations: "/admin/deactivation-requests",
   adminVerification: "/admin/verification",
   adminAppointments: "/admin/appointments",
 };
@@ -51,6 +54,7 @@ export async function notify(userIds, { kind, title, body = "", link, groupKey }
       }
       await prisma.notification.create({ data: { userId, kind, title, body, link, groupKey } });
     }
+    publish(ids, { type: "notification" }); // their bell refreshes at once
   } catch (error) {
     console.error(`[notifications] could not notify (${kind}): ${error.message}`);
   }

@@ -2,6 +2,7 @@ import { prisma } from "../config/prisma.js";
 import { appointmentInclude, toAppointment } from "../models/appointment.js";
 import { conflict } from "../utils/errors.js";
 import { LINKS, notify, notifyDoctor } from "./notifications.js";
+import { publish } from "./realtime.js";
 
 // Who may move an appointment request from which status to which. `completed` is only ever set by
 // an administrator; a doctor accepts or rejects, and a patient cancels.
@@ -104,6 +105,8 @@ export async function changeAppointmentStatus(appointment, status, allowed, acto
       : []),
   ]);
   const result = toAppointment(updated);
+  // The new chat appears in both people's Messages page straight away.
+  if (status === "accepted") publish([patientId, updated.doctor.userId], { type: "conversation" });
   if (actor) await announce(actor, result, patientId);
   return result;
 }

@@ -33,7 +33,7 @@ const clinics = [
     city: "Dhaka",
     phone: "+880 2 5500 1200",
     openingHours: "8:00 AM–9:00 PM",
-    image: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=900&q=80",
+    image: "images/facilities/carewell-medical-centre.jpg",
   },
   {
     name: "Lakeside Specialist Hospital",
@@ -43,7 +43,7 @@ const clinics = [
     city: "Dhaka",
     phone: "+880 2 5881 4500",
     openingHours: "Open 24 hours",
-    image: "https://images.unsplash.com/photo-1586773860418-d37222d8fce3?auto=format&fit=crop&w=900&q=80",
+    image: "images/facilities/lakeside-specialist-hospital.jpg",
   },
   {
     name: "Greenline Family Clinic",
@@ -53,7 +53,7 @@ const clinics = [
     city: "Dhaka",
     phone: "+880 2 8822 1000",
     openingHours: "9:00 AM–8:00 PM",
-    image: "https://images.unsplash.com/photo-1631815588090-d4bfec5b1ccb?auto=format&fit=crop&w=900&q=80",
+    image: "images/facilities/greenline-family-clinic.jpg",
   },
 ];
 

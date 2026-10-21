@@ -1,4 +1,5 @@
 import { clock, dateKey, timeLabel } from "../utils/time.js";
+import { photoUrl } from "./user.js";
 
 /** `booked` is derived: a slot with an accepted appointment is booked, whatever the doctor set. */
 export function toSlot(slot) {
@@ -39,7 +40,7 @@ export function toAppointment(appointment) {
       id: appointment.doctor.id,
       name: appointment.doctor.user.name,
       specialty: appointment.doctor.specialty.name,
-      image: appointment.doctor.image ?? "",
+      image: photoUrl(appointment.doctor.user) ?? appointment.doctor.image ?? "",
     },
     facility: {
       id: appointment.clinic.id,

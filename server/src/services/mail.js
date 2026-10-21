@@ -23,8 +23,8 @@ const getTransport = () =>
  * Sends one email. Never throws: a mail problem must not break sign-up or password reset,
  * and the caller cannot do anything useful about it. Failures are logged without the body.
  */
-export async function sendMail({ to, subject, text }) {
-  const message = { from: env.smtp.from, to, subject, text };
+export async function sendMail({ to, subject, text, replyTo }) {
+  const message = { from: env.smtp.from, to, subject, text, ...(replyTo ? { replyTo } : {}) };
   if (env.nodeEnv === "test") {
     outbox.push(message);
     return true;
@@ -52,6 +52,23 @@ export const sendVerificationEmail = ({ to, name, code, minutes }) =>
     text:
       `Hello ${name},\n\nYour Carewell verification code is: ${code}\n\n` +
       `It expires in ${minutes} minutes. If you did not create a Carewell account, you can ignore this email.${sign}`,
+  });
+
+/**
+ * Forwards a help-page message to the Carewell support mailbox. "Reply" in the mail program
+ * answers the person directly, because their address is set as Reply-To.
+ */
+export const sendSupportRequestEmail = ({ to, replyTo, name, email, message, id, signedIn }) =>
+  sendMail({
+    to,
+    replyTo,
+    subject: `[Carewell support] ${message.replace(/\s+/g, " ").slice(0, 70)}`,
+    text:
+      `A new message arrived through the Carewell help page.\n\n` +
+      `From: ${name ? `${name} (${signedIn ? "signed-in patient" : "visitor"})` : "a visitor"}\n` +
+      `Email: ${email ?? "not provided: you cannot reply by email"}\n` +
+      `Reference: ${id}\n\nMessage:\n${message}\n\n` +
+      `You can also review and reply to it in the administrator area (Support requests).`,
   });
 
 export const sendPasswordResetEmail = ({ to, name, link, minutes }) =>

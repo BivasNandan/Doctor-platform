@@ -48,6 +48,8 @@ export const env = {
     password: process.env.SMTP_PASSWORD,
     from: process.env.MAIL_FROM ?? process.env.SMTP_USER ?? "Carewell <no-reply@carewell.local>",
   },
+  /** Where help-page messages are emailed (default: the mailbox the API sends from). */
+  supportEmail: process.env.SUPPORT_EMAIL ?? process.env.SMTP_USER ?? "",
   databaseUrl: process.env.DATABASE_URL,
   storageEndpoint: process.env.AWS_ENDPOINT_URL_S3,
   storageAccessKeyId: process.env.AWS_ACCESS_KEY_ID,

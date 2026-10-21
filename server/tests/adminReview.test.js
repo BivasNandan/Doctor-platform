@@ -175,12 +175,10 @@ describe("deactivation requests", () => {
 describe("support requests", () => {
   it("accepts a message from a guest, with or without an email", async () => {
     const created = ok(
-      await ctx
-        .client()
-        .post("/support-requests", {
-          message: "I cannot find my doctor's profile",
-          email: "Guest@Test.Local",
-        }),
+      await ctx.client().post("/support-requests", {
+        message: "I cannot find my doctor's profile",
+        email: "Guest@Test.Local",
+      }),
       201,
     );
     assert.equal(created.status, "received");

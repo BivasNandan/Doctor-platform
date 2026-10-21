@@ -82,6 +82,29 @@ export const supportService = {
   submit: (input) => http.post("/support-requests", input),
 };
 
+// ─── reviews and profile photos ────────────────────────────────────────────────────────────
+
+export const reviewService = {
+  /** Public. Resolves `{ summary: { average, count, distribution }, items, viewer: { canReview, myReview } }`. */
+  list: (doctorId, { limit = 20, offset = 0 } = {}) =>
+    http.get(`/doctors/${segment(doctorId)}/reviews`, { query: { limit, offset } }),
+  /** A patient with a completed visit rates the doctor once. `{ rating: 1-5, comment? }`. */
+  create: (doctorId, input) => http.post(`/doctors/${segment(doctorId)}/reviews`, input),
+  update: (id, input) => http.patch(`/reviews/${segment(id)}`, input),
+  remove: (id) => http.delete(`/reviews/${segment(id)}`),
+};
+
+export const photoService = {
+  /** Uploads the signed-in person's profile photo (JPEG, PNG or WebP, up to 2 MB). Resolves `{ user }`. */
+  upload(file) {
+    const form = new FormData();
+    form.append("file", file);
+    return http.post("/me/photo", form);
+  },
+  /** Removes the profile photo. Resolves `{ user }`. */
+  remove: () => http.delete("/me/photo"),
+};
+
 // ─── appointments ──────────────────────────────────────────────────────────────────────────
 
 /** Patient-facing appointment requests. */
@@ -179,6 +202,14 @@ export const adminService = {
   // Appointments
   listAppointments: () => http.get("/admin/appointments"),
   updateAppointmentStatus: (id, status) => http.patch(`/admin/appointments/${segment(id)}`, { status }),
+
+  // Patients
+  listPatients: ({ query, status } = {}) => http.get("/admin/patients", { query: { query, status } }),
+  setPatientStatus: (id, status) => http.patch(`/admin/patients/${segment(id)}/status`, { status }),
+
+  // Review moderation
+  listReviews: (status) => http.get("/admin/reviews", { query: { status } }),
+  setReviewStatus: (id, status) => http.patch(`/admin/reviews/${segment(id)}`, { status }),
 
   // Support and account review
   listSupportRequests: (status) => http.get("/admin/support-requests", { query: { status } }),

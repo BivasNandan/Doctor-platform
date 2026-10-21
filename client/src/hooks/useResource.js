@@ -9,7 +9,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * @param {{enabled?: boolean, refreshMs?: number}} [options]
  *   `refreshMs` re-runs the loader quietly every that many milliseconds (no loading flash, paused while
  *   the tab is hidden, and refreshed as soon as the tab is visible again). Use it for live-ish data.
- * @returns {{data: T|undefined, error: Error|null, loading: boolean, reload: () => void, setData: Function}}
+ * @returns {{data: T|undefined, error: Error|null, loading: boolean, reload: () => void,
+ *   refresh: () => Promise<void>, setData: Function}}
+ *   `refresh()` re-runs the loader quietly (no loading flash); `reload()` shows the loading state.
  */
 export function useResource(loader, deps = [], { enabled = true, refreshMs = 0 } = {}) {
   const [state, setState] = useState({ data: undefined, error: null, loading: enabled });
@@ -18,24 +20,41 @@ export function useResource(loader, deps = [], { enabled = true, refreshMs = 0 }
   useEffect(() => {
     loaderRef.current = loader;
   });
+  const latest = useRef(0); // ticket of the newest request: an older answer must never overwrite a newer one
+  const edits = useRef(0); // how many times the page changed the data itself through setData
+
+  /**
+   * One quiet load. An answer that is already outdated is dropped, and if the page changed the data
+   * (for example showed a pushed message) while the request was in flight, the data is fetched again
+   * instead of overwriting that change with an older copy.
+   */
+  const quietLoad = useCallback(async () => {
+    latest.current += 1;
+    const ticket = latest.current;
+    const editsAtStart = edits.current;
+    let data;
+    try {
+      data = await loaderRef.current();
+    } catch {
+      return; // a failed background refresh keeps showing the last good data
+    }
+    if (ticket !== latest.current) return;
+    if (edits.current !== editsAtStart) {
+      await quietLoad();
+      return;
+    }
+    setState((current) => ({ ...current, data, error: null }));
+  }, []);
 
   useEffect(() => {
     if (!enabled || !refreshMs) return undefined;
-    let cancelled = false;
     const refresh = () => {
-      if (document.hidden) return;
-      loaderRef
-        .current()
-        .then((data) => {
-          if (!cancelled) setState((current) => ({ ...current, data, error: null }));
-        })
-        .catch(() => undefined); // a failed background refresh keeps showing the last good data
+      if (!document.hidden) quietLoad();
     };
     const timer = setInterval(refresh, refreshMs);
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("focus", refresh);
     return () => {
-      cancelled = true;
       clearInterval(timer);
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("focus", refresh);
@@ -47,6 +66,7 @@ export function useResource(loader, deps = [], { enabled = true, refreshMs = 0 }
   useEffect(() => {
     if (!enabled) return undefined;
     let cancelled = false;
+    latest.current += 1; // anything still in flight belongs to the previous inputs
     setState((current) => ({ ...current, loading: true, error: null }));
     loader()
       .then((data) => {
@@ -63,14 +83,14 @@ export function useResource(loader, deps = [], { enabled = true, refreshMs = 0 }
   }, [...deps, version, enabled]);
 
   const reload = useCallback(() => setVersion((value) => value + 1), []);
-  const setData = useCallback(
-    (updater) =>
-      setState((current) => ({
-        ...current,
-        data: typeof updater === "function" ? updater(current.data) : updater,
-      })),
-    [],
-  );
+  const refresh = quietLoad;
+  const setData = useCallback((updater) => {
+    edits.current += 1;
+    setState((current) => ({
+      ...current,
+      data: typeof updater === "function" ? updater(current.data) : updater,
+    }));
+  }, []);
 
-  return { ...state, reload, setData };
+  return { ...state, reload, refresh, setData };
 }

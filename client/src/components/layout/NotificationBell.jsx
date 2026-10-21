@@ -2,6 +2,7 @@ import { Bell, CalendarCheck, LifeBuoy, MessageCircle, ShieldCheck, Stethoscope 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useRealtime, useRealtimeEvent } from "../../context/RealtimeContext.jsx";
 import { useToast } from "../../context/ToastContext.jsx";
 import { useDismiss } from "../../hooks/useDismiss.js";
 import { useResource } from "../../hooks/useResource.js";
@@ -9,7 +10,9 @@ import { notificationService } from "../../services/index.js";
 import { timeAgo } from "../../utils/dates.js";
 import { IconButton } from "../ui/index.js";
 
+// Live events make the bell update at once; polling stays as a slow safety net (and the fallback when offline).
 const NOTIFICATION_REFRESH_MS = 10_000;
+const NOTIFICATION_LIVE_REFRESH_MS = 60_000;
 
 const KIND_ICONS = {
   appointment: CalendarCheck,
@@ -31,9 +34,13 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const seen = useRef(null); // ids already shown; null until the first load
+  const { connected } = useRealtime();
   const feed = useResource(() => notificationService.list({ limit: 20 }), [user?.id], {
     enabled: Boolean(user),
-    refreshMs: NOTIFICATION_REFRESH_MS,
+    refreshMs: connected ? NOTIFICATION_LIVE_REFRESH_MS : NOTIFICATION_REFRESH_MS,
+  });
+  useRealtimeEvent(["notification"], () => {
+    if (user) feed.refresh();
   });
   const items = feed.data?.items ?? [];
   const unread = feed.data?.unreadCount ?? 0;

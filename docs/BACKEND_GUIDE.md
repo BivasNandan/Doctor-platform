@@ -132,10 +132,10 @@ After each step, switch the client to `api` mode and click through the matching 
 | 1 | **Patient identity** – accounts, or guest bookings tracked by signed cookie + email verification? | `GET /appointments`, cancellation, messaging eligibility |
 | 2 | **Doctor onboarding** – email verification? document upload (`doctor_certificates`) during registration? | registration endpoint, admin review screen shows "certificate metadata not supplied" today |
 | 3 | **Notifications** – email/SMS for new requests and decisions? (the bell in the topbar is disabled) | new module + provider |
-| 4 | **Real-time messaging** – WebSocket or SSE; presence and read receipts | messaging module, client hook |
+| 4 | ~~Real-time messaging~~ **Done with Server-Sent Events** (messages, read receipts, notifications). Left: presence ("online"), and a shared channel such as Redis if more than one server process is ever run | `services/realtime.js`, `context/RealtimeContext.jsx` |
 | 5 | **Pagination envelope** – `{ data, meta }` vs plain arrays | all list endpoints, client services |
 | 6 | **Time zones / slot generation** – are `availability_slots` windows split into bookable times (and at what interval)? | `/doctors/:id/slots`, "next available" |
-| 7 | **Public stats** (`250+ specialists`, ratings) – real endpoint or remove | discovery home page |
+| 7 | **Public stats** (`250+ specialists`) – real endpoint or remove. (Doctor ratings are now real, from patient reviews.) | discovery home page |
 | 8 | **Hosting** – client on static hosting, API on its own domain (cookies, CORS) | deployment |
 
 ## 8. Definition of done for the first release

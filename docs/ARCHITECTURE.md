@@ -38,7 +38,7 @@ components/              reusable pieces, one component per file
 
 hooks/                   useResource (load data, optional quiet refresh), useAction, useDebouncedValue,
                          useDocumentTitle, useModalBehavior, useDismiss, useDoctorFilters
-context/                 Theme, Toast, Confirm, Auth, Catalog (clinics + specialties) and Booking providers
+context/                 Theme, Toast, Confirm, Auth, Realtime (live-update stream), Catalog (clinics + specialties) and Booking providers
 
 services/                the ONLY layer that touches data
   index.js                 picks the real API or the demo from VITE_CAREWELL_DATA_MODE
@@ -78,6 +78,8 @@ Screen ──useResource──▶ services/index.js ──▶ api.js ──▶ h
 Routing: `HashRouter` (works on static hosts). Doctor-directory filters live in the URL query string
 (`#/doctors?specialty=cardiology`), so searches are shareable and survive refresh. Role-restricted routes are
 lazy-loaded, so patients never download admin code.
+
+Live updates: after sign-in, `RealtimeProvider` opens one `EventSource` to `GET /events` (API mode only). The bell and the Messages page subscribe with `useRealtimeEvent` and call `useResource`'s quiet `refresh()` when an event arrives, so new messages and notifications show instantly. While the stream is down they fall back to their old polling intervals.
 
 Sessions: `AuthProvider` calls `GET /auth/me` on load. Any protected request that returns 401 clears the local user
 (`setUnauthorizedHandler`).

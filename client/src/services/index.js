@@ -16,6 +16,8 @@ export const {
   specialtyService,
   slotService,
   supportService,
+  reviewService,
+  photoService,
   appointmentService,
   doctorPortalService,
   availabilityService,

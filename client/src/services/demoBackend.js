@@ -100,6 +100,7 @@ function createDb() {
         simulated: true,
       },
     ],
+    reviews: [],
     supportRequests: [],
     deactivationRequests: [],
     notifications: [
@@ -371,6 +372,11 @@ export const authService = {
     let user;
     if (portal === ROLES.PATIENT) {
       const registered = db.patients.find((item) => item.email.toLowerCase() === email.toLowerCase());
+      if (registered && isAccountRestricted(registered))
+        throw new ApiError(`This account is ${registered.accountStatus}. Contact Carewell administration.`, {
+          status: 403,
+          code: "ACCOUNT_RESTRICTED",
+        });
       user = registered ? { ...registered } : { ...DEMO_PATIENT, email };
     } else if (portal === ROLES.ADMIN) {
       user = {
@@ -940,6 +946,190 @@ export const messagingService = {
   },
 };
 
+// ─── reviews and profile photos ────────────────────────────────────────────────────────────
+
+const REVIEW_COMMENT_MAX = 1000;
+const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+
+/** "Nadia Rahman" -> "Nadia R.", as the API shows reviewers. */
+function reviewerName(name = "") {
+  const [first = "", ...rest] = name.trim().split(/\s+/);
+  const last = rest.at(-1);
+  return last ? `${first} ${last[0].toUpperCase()}.` : first || "A patient";
+}
+
+const visibleReviews = (doctorId) =>
+  db.reviews.filter((item) => item.doctorId === doctorId && item.status === "visible");
+
+const averageOf = (reviews) =>
+  reviews.length
+    ? Math.round((reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length) * 10) / 10
+    : 0;
+
+/** Keeps the doctor's public average and count in step with their visible reviews. */
+function refreshRating(doctorId) {
+  const doctor = findDoctor(doctorId);
+  if (!doctor) return;
+  const visible = visibleReviews(doctorId);
+  doctor.reviewCount = visible.length;
+  doctor.rating = averageOf(visible);
+}
+
+const hasCompletedVisit = (patientId, doctorId) =>
+  db.appointments.some(
+    (item) =>
+      item.patientUserId === patientId &&
+      item.doctorId === doctorId &&
+      item.status === APPOINTMENT_STATUS.COMPLETED,
+  );
+
+function reviewInput({ rating, comment }, { partial = false } = {}) {
+  const found = {};
+  const out = {};
+  if (!partial || rating !== undefined) {
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) found.rating = "Choose a rating from 1 to 5.";
+    else out.rating = rating;
+  }
+  if (!partial || comment !== undefined) {
+    const text = String(comment ?? "").trim();
+    if (text.length > REVIEW_COMMENT_MAX) found.comment = "Please keep the review under 1,000 characters.";
+    else out.comment = text;
+  }
+  if (Object.keys(found).length) throw invalid(Object.values(found)[0], found);
+  return out;
+}
+
+const toReview = (review, viewerId) => ({
+  id: review.id,
+  rating: review.rating,
+  comment: review.comment,
+  author: reviewerName(review.patientName),
+  createdAt: review.createdAt,
+  updatedAt: review.updatedAt,
+  ...(review.patientId === viewerId ? { mine: true } : {}),
+});
+
+export const reviewService = {
+  async list(doctorId, { limit = 20, offset = 0 } = {}) {
+    const doctor = findDoctor(doctorId);
+    if (!doctor || !isPubliclyListed(doctor)) throw notFound("This doctor profile");
+    const viewer = db.session?.role === ROLES.PATIENT ? db.session : null;
+    const visible = visibleReviews(doctorId);
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    visible.forEach((item) => (distribution[item.rating] += 1));
+    const mine =
+      viewer && db.reviews.find((item) => item.doctorId === doctorId && item.patientId === viewer.id);
+    return reply({
+      summary: { average: averageOf(visible), count: visible.length, distribution },
+      items: [...visible]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(offset, offset + limit)
+        .map((item) => toReview(item, viewer?.id)),
+      viewer: {
+        canReview: Boolean(viewer && !mine && hasCompletedVisit(viewer.id, doctorId)),
+        myReview: mine ? toReview(mine, viewer.id) : null,
+      },
+    });
+  },
+
+  async create(doctorId, input) {
+    const patient = requireRole(ROLES.PATIENT);
+    const doctor = findDoctor(doctorId);
+    if (!doctor || !isPubliclyListed(doctor)) throw notFound("This doctor profile");
+    const data = reviewInput(input);
+    if (!hasCompletedVisit(patient.id, doctorId))
+      throw new ApiError("You can review a doctor after a completed visit with them.", {
+        status: 403,
+        code: "REVIEW_NOT_ELIGIBLE",
+      });
+    if (db.reviews.some((item) => item.doctorId === doctorId && item.patientId === patient.id))
+      throw conflict(
+        "You have already reviewed this doctor. You can edit your review instead.",
+        "ALREADY_REVIEWED",
+      );
+    const now = new Date().toISOString();
+    const review = {
+      id: nextId("DEMO-REV"),
+      doctorId,
+      patientId: patient.id,
+      patientName: patient.name,
+      patientEmail: patient.email,
+      ...data,
+      status: "visible",
+      createdAt: now,
+      updatedAt: now,
+    };
+    db.reviews.unshift(review);
+    refreshRating(doctorId);
+    pushNotification("doctor", {
+      kind: "doctor",
+      title: `New ${data.rating}-star review`,
+      body: `${patient.name.split(" ")[0]} rated you ${data.rating} out of 5.`,
+      link: "/doctor/dashboard",
+    });
+    return reply(toReview(review, patient.id));
+  },
+
+  async update(id, input) {
+    const patient = requireRole(ROLES.PATIENT);
+    const review = db.reviews.find((item) => item.id === id && item.patientId === patient.id);
+    if (!review) throw notFound("This review");
+    const data = reviewInput(input, { partial: true });
+    if (!Object.keys(data).length) throw invalid("Nothing to change.");
+    Object.assign(review, data, { updatedAt: new Date().toISOString() });
+    refreshRating(review.doctorId);
+    return reply(toReview(review, patient.id));
+  },
+
+  async remove(id) {
+    const patient = requireRole(ROLES.PATIENT);
+    const review = db.reviews.find((item) => item.id === id && item.patientId === patient.id);
+    if (!review) throw notFound("This review");
+    db.reviews = db.reviews.filter((item) => item !== review);
+    refreshRating(review.doctorId);
+    return reply(null);
+  },
+};
+
+/** The picture as a data: URL, so the demo can show it without a server. */
+async function readAsDataUrl(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  return `data:${file.type};base64,${btoa(binary)}`;
+}
+
+/** Stores the photo on whoever is signed in and returns the updated user. */
+function applyPhoto(photoUrl) {
+  const session = requireViewer();
+  if (session.role === ROLES.PATIENT) return savePatient({ photoUrl });
+  if (session.role === ROLES.DOCTOR) {
+    const doctor = findDoctor(session.doctorId);
+    if (doctor) doctor.image = photoUrl ?? "";
+  }
+  db.session = { ...session, photoUrl };
+  return db.session;
+}
+
+export const photoService = {
+  async upload(file) {
+    requireViewer();
+    if (!file || !PHOTO_TYPES.includes(file.type))
+      throw invalid("Choose a JPEG, PNG or WebP picture.", { file: "Unsupported file type." });
+    if (file.size > PHOTO_MAX_BYTES)
+      throw new ApiError("The file is larger than 2 MB.", { status: 413, code: "FILE_TOO_LARGE" });
+    const dataUrl = await readAsDataUrl(file);
+    return reply({ user: applyPhoto(dataUrl) });
+  },
+
+  async remove() {
+    requireViewer();
+    return reply({ user: applyPhoto(undefined) });
+  },
+};
+
 // ─── admin ─────────────────────────────────────────────────────────────────────────────────
 
 const admin = () => requireRole(ROLES.ADMIN);
@@ -966,6 +1156,30 @@ function monthlySeries() {
     };
   });
 }
+
+const toAdminPatient = (patient) => ({
+  id: patient.id,
+  name: patient.name,
+  email: patient.email,
+  phone: patient.phone,
+  accountStatus: patient.accountStatus ?? "active",
+  emailVerified: Boolean(patient.emailVerified),
+  photoUrl: patient.photoUrl,
+  appointmentCount: db.appointments.filter((entry) => entry.patientUserId === patient.id).length,
+  createdAt: patient.createdAt ?? new Date(0).toISOString(),
+});
+
+const toModerationReview = (review) => ({
+  id: review.id,
+  doctorId: review.doctorId,
+  doctorName: findDoctor(review.doctorId)?.name ?? "",
+  patientName: review.patientName,
+  patientEmail: review.patientEmail,
+  rating: review.rating,
+  comment: review.comment,
+  status: review.status,
+  createdAt: review.createdAt,
+});
 
 export const adminService = {
   async getSummary() {
@@ -1135,6 +1349,46 @@ export const adminService = {
       link: "/doctor/dashboard",
     });
     return reply(hydrate(appointment));
+  },
+
+  // Patients -----------------------------------------------------------
+  async listPatients({ query, status } = {}) {
+    admin();
+    const needle = (query ?? "").trim().toLowerCase();
+    return reply(
+      db.patients
+        .filter((item) => !status || (item.accountStatus ?? "active") === status)
+        .filter(
+          (item) =>
+            !needle || `${item.name} ${item.email} ${item.phone ?? ""}`.toLowerCase().includes(needle),
+        )
+        .map((item) => toAdminPatient(item)),
+    );
+  },
+
+  async setPatientStatus(id, status) {
+    admin();
+    if (!["active", "suspended"].includes(status)) throw invalid("Choose active or suspended.");
+    const patient = db.patients.find((item) => item.id === id);
+    if (!patient) throw notFound("This patient");
+    patient.accountStatus = status;
+    return reply(toAdminPatient(patient));
+  },
+
+  // Review moderation --------------------------------------------------
+  async listReviews(status) {
+    admin();
+    return reply(db.reviews.filter((item) => !status || item.status === status).map(toModerationReview));
+  },
+
+  async setReviewStatus(id, status) {
+    admin();
+    if (!["visible", "hidden"].includes(status)) throw invalid("Choose visible or hidden.");
+    const review = db.reviews.find((item) => item.id === id);
+    if (!review) throw notFound("This review");
+    review.status = status;
+    refreshRating(review.doctorId);
+    return reply(toModerationReview(review));
   },
 
   // Support and account review ----------------------------------------

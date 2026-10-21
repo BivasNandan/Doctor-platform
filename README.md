@@ -55,8 +55,8 @@ The full app needs two services. Ask whoever runs the project for the values, or
 | You need | What for | Where to get it |
 | --- | --- | --- |
 | A **PostgreSQL database** | users, doctors, appointments, messages | [Neon](https://neon.tech): create a project, then copy the *pooled* and the *direct* connection strings from **Connection details** |
-| An **S3-compatible bucket** (private) | certificates and message attachments | Neon Object Storage (see `neon.ts` for the bucket this project declares): endpoint URL, access key, secret key, region and bucket name |
-| An email account *(optional)* | verification codes and reset links | Any SMTP server. For Gmail, turn on 2-Step Verification and create an *App Password*. Without it, codes are printed in the terminal instead |
+| An **S3-compatible bucket** (private) | certificates, message attachments and profile photos | Neon Object Storage (see `neon.ts` for the bucket this project declares): endpoint URL, access key, secret key, region and bucket name |
+| An email account *(optional)* | verification codes, reset links and the copies of help-page messages sent to the Carewell inbox | Any SMTP server. For Gmail, turn on 2-Step Verification and create an *App Password*. Without it, codes are printed in the terminal instead |
 
 Then, from the project folder:
 
@@ -100,10 +100,12 @@ Run from the project folder unless noted.
 | --- | --- |
 | `npm run dev` | Start the API and the website together |
 | `npm run setup` | First-time setup (safe to repeat) |
-| `npm test` | Server tests (about 30 minutes: they use a temporary schema in your database) and client tests |
+| `npm test` | Server tests (about 45 minutes: they use a temporary schema in your database) and client tests |
 | `npm --prefix client test -- --run` | Client tests only (about 40 seconds) |
 | `npm --prefix client run check` | What CI runs: lint, format check, tests and a production build |
 | `npm --prefix server run seed` | Re-create the first administrator, specialties and clinics |
+| `npm run seed:images` | Gives the demo doctors and facilities their photos (stored in `client/public/images`, credited in [docs/IMAGE_CREDITS.md](docs/IMAGE_CREDITS.md)). `seed:demo` already does this for new data; run it on a database seeded earlier. Safe to repeat |
+| `npm run seed:demo` | Fill the database with realistic fictional data: 15 specialties, 11 clinics and hospitals, 16 published doctors with open times, 4 patients, appointment requests in every status, conversations and support requests. Needs `SEED_DEMO_PASSWORD` in `.env.local` (the password of every demo account). Safe to repeat |
 | `npm --prefix server run verify:services` | Check that the database and the bucket can be reached |
 
 The API's tests build a throw-away schema from the migrations and delete it afterwards, so real data is never touched.
@@ -124,13 +126,14 @@ The API's tests build a throw-away schema from the migrations and delete it afte
 ```text
 client/   React app: pages/, components/, hooks/, context/, services/ (real API or demo data), utils/, styles/
 server/   Express API: routes/ → controllers/ → services/ → models/ (+ middleware/, utils/), prisma/ (schema + migrations), tests/
-docs/     API_CONTRACT.md · DATA_MODEL.md · ARCHITECTURE.md · BACKEND_GUIDE.md · PRD_TRACEABILITY.md
+docs/     API_CONTRACT.md · DATA_MODEL.md · ARCHITECTURE.md · BACKEND_GUIDE.md · PRD_TRACEABILITY.md · IMAGE_CREDITS.md
 scripts/  setup.mjs · dev.mjs
 .github/  CI and GitHub Pages deployment
 ```
 
 - The website talks to the API only through `client/src/services/`. A switch (`VITE_CAREWELL_DATA_MODE`) chooses the
   real API or the in-memory demo, and the demo tests double as an executable specification of the API.
+- Patients can rate a doctor after a completed visit, everyone can add a profile photo, and messages and notifications arrive instantly over a Server-Sent Events stream (`GET /events`). Administrators manage patients (search, suspend, restore) and moderate reviews. Messages sent through the help page are also emailed to `SUPPORT_EMAIL` (the `SMTP_USER` mailbox by default).
 - Sign-in uses an HttpOnly cookie session; the database enforces the important rules (no double-booked times, only
   verified doctors can be published) so they cannot be bypassed.
 - Never run `prisma db push`. Change `server/prisma/schema.prisma`, then create a migration.

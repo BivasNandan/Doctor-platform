@@ -53,7 +53,11 @@ export async function discardUpload(storageKey) {
 }
 
 /** Sends a stored file to the browser, as a download or inline preview. */
-export async function sendStoredFile(response, { storageKey, fileName, fileType }, { inline = false } = {}) {
+export async function sendStoredFile(
+  response,
+  { storageKey, fileName, fileType },
+  { inline = false, cacheControl = "private, no-store" } = {},
+) {
   const body = await getObject(storageKey);
   // Rows that do not record a type (certificates) get it from the file's own first bytes.
   const type =
@@ -64,7 +68,7 @@ export async function sendStoredFile(response, { storageKey, fileName, fileType 
     "Content-Type": type,
     "Content-Length": String(body.length),
     "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(fileName)}`,
-    "Cache-Control": "private, no-store",
+    "Cache-Control": cacheControl,
     "X-Content-Type-Options": "nosniff",
   });
   response.end(body);

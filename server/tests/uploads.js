@@ -8,6 +8,9 @@ export function useTestStoragePrefix() {
 }
 
 export const pdfBytes = (extra = 64) => Buffer.concat([Buffer.from("%PDF-1.4\n"), Buffer.alloc(extra, 65)]);
+export const jpegBytes = () => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 2)]);
+export const webpBytes = () =>
+  Buffer.concat([Buffer.from("RIFF"), Buffer.from([64, 0, 0, 0]), Buffer.from("WEBP"), Buffer.alloc(64, 3)]);
 export const pngBytes = () =>
   Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
 
@@ -41,16 +44,20 @@ export async function download(ctx, client, path) {
   return {
     status: response.status,
     type: response.headers.get("content-type"),
+    cacheControl: response.headers.get("cache-control"),
     bytes: Buffer.from(await response.arrayBuffer()),
   };
 }
 
-/** Deletes every file the test run stored (certificates and message attachments). */
+/** Deletes every file the test run stored (certificates, message attachments and profile photos). */
 export async function cleanupStorage(ctx) {
   const { deleteObject } = await import("../src/services/storage.js");
   const keys = [
     ...(await ctx.prisma.doctorCertificate.findMany({ select: { storageKey: true } })),
     ...(await ctx.prisma.messageAttachment.findMany({ select: { storageKey: true } })),
+    ...(
+      await ctx.prisma.user.findMany({ where: { photoKey: { not: null } }, select: { photoKey: true } })
+    ).map((row) => ({ storageKey: row.photoKey })),
   ].map((row) => row.storageKey);
   await Promise.all(keys.map((key) => deleteObject(key).catch(() => undefined)));
 }

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { authService, setUnauthorizedHandler } from "../services/index.js";
+import { authService, photoService, setUnauthorizedHandler } from "../services/index.js";
 
 const AuthContext = createContext(null);
 
@@ -60,6 +60,13 @@ export function AuthProvider({ children }) {
     return result.user;
   }, []);
 
+  /** Uploads (or, with no file, removes) the signed-in person's profile photo. Resolves the updated user. */
+  const changePhoto = useCallback(async (file) => {
+    const result = file ? await photoService.upload(file) : await photoService.remove();
+    setUser(result.user);
+    return result.user;
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authService.logout();
@@ -79,9 +86,10 @@ export function AuthProvider({ children }) {
       verifyEmail,
       resendVerification: authService.resendVerification,
       updateProfile,
+      changePhoto,
       logout,
     }),
-    [user, status, login, registerDoctor, registerPatient, verifyEmail, updateProfile, logout],
+    [user, status, login, registerDoctor, registerPatient, verifyEmail, updateProfile, changePhoto, logout],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -1,11 +1,12 @@
-/** External stock imagery. Host these in /public/images for production. */
-export const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=1000&q=85";
+import { assetUrl } from "../../utils/assets.js";
+
+/** Photos in /public/images (credits: docs/IMAGE_CREDITS.md). */
+export const HERO_IMAGE = "images/hero/hero-doctor.jpg";
 
 export const HERO_AVATARS = [
-  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop&crop=faces",
-  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=64&h=64&fit=crop&crop=faces",
-  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=64&h=64&fit=crop&crop=faces",
+  "images/people/patient-1.jpg",
+  "images/people/patient-2.jpg",
+  "images/people/patient-3.jpg",
 ];
 
 /** Home-page hero. `doctor` is the profile highlighted in the floating card. */
@@ -33,7 +34,7 @@ export default function HeroSection() {
         <div className="hero-proof">
           <div className="avatar-stack">
             {HERO_AVATARS.map((src) => (
-              <img key={src} src={src} alt="" loading="lazy" />
+              <img key={src} src={assetUrl(src)} alt="" loading="lazy" />
             ))}
           </div>
           <span>
@@ -46,7 +47,7 @@ export default function HeroSection() {
       </div>
       <div className="hero-visual">
         <div className="hero-image-wrap">
-          <img className="hero-image" src={HERO_IMAGE} alt="Doctor in a calm, welcoming clinic" />
+          <img className="hero-image" src={assetUrl(HERO_IMAGE)} alt="A smiling doctor in a white coat" />
           <div className="hero-image-overlay" />
           <span className="image-stamp">CW—01</span>
         </div>

@@ -102,6 +102,9 @@ model User {
   accountStatus   AccountStatus @default(active) @map("account_status")
   /// Null until the emailed code is confirmed. API field `emailVerified` = (value !== null).
   emailVerifiedAt DateTime?     @map("email_verified_at") @db.Timestamptz(3)
+  /// Object-storage key of the profile photo (null = none). Served by GET /photos/users/:id.
+  photoKey        String?       @map("photo_key")
+  photoUpdatedAt  DateTime?     @map("photo_updated_at") @db.Timestamptz(3)
   lastSeenAt      DateTime?     @map("last_seen_at") @db.Timestamptz(3)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -114,6 +117,7 @@ model User {
   emailVerifications   EmailVerification[]
   passwordResets       PasswordReset[]
   notifications        Notification[]
+  reviews              Review[]              @relation("PatientReviews")
   supportRequests      SupportRequest[]
   auditEntries         AuditLog[]
   decidedDeactivations DeactivationRequest[] @relation("DeactivationDecider")
@@ -238,6 +242,7 @@ model Doctor {
   conversations        Conversation[]
   certificates         DoctorCertificate[]
   deactivationRequests DeactivationRequest[]
+  reviews              Review[]
 
   @@index([specialtyId])
   @@index([verificationStatus, publicationStatus])
@@ -455,4 +460,30 @@ model Notification {
   @@index([userId, createdAt])
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+enum ReviewStatus {
+  visible
+  hidden
+}
+
+/// A patient's rating (1 to 5) and optional comment about a doctor they have seen. One per patient and doctor.
+model Review {
+  id        String       @id @default(uuid()) @db.Uuid
+  doctorId  String       @map("doctor_id") @db.Uuid
+  patientId String       @map("patient_id") @db.Uuid
+  /// 1 to 5, enforced by a CHECK constraint in the migration.
+  rating    Int
+  comment   String       @default("")
+  /// Administrators can hide a review; hidden reviews do not count towards the rating.
+  status    ReviewStatus @default(visible)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  doctor  Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient User   @relation("PatientReviews", fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, doctorId])
+  @@index([doctorId, status, createdAt])
+  @@map("reviews")
 }

@@ -1,4 +1,6 @@
 import { prisma } from "../config/prisma.js";
+import { ratingsFor } from "./review.js";
+import { photoUrl } from "./user.js";
 import { addDays, clock, dateKey, dhakaNow, minutesOf, timeLabel, weekday } from "../utils/time.js";
 
 export const doctorInclude = { user: true, specialty: true, clinics: true };
@@ -39,14 +41,20 @@ export async function loadAvailability(doctorIds) {
   return result;
 }
 
-export function toDoctor(doctor, availability = { nextAvailable: "To be scheduled", availability: [] }) {
+export function toDoctor(
+  doctor,
+  availability = { nextAvailable: "To be scheduled", availability: [] },
+  ratings = { rating: 0, reviewCount: 0 },
+) {
   return {
     id: doctor.id,
     name: doctor.user.name,
     email: doctor.user.email,
     specialtyId: doctor.specialtyId,
     specialty: doctor.specialty.name,
-    image: doctor.image ?? "",
+    image: photoUrl(doctor.user) ?? doctor.image ?? "",
+    rating: ratings.rating,
+    reviewCount: ratings.reviewCount,
     qualifications: doctor.qualifications,
     experienceYears: doctor.experienceYears,
     fee: doctor.fee,
@@ -71,8 +79,9 @@ export async function findDoctors(args = {}) {
     include: doctorInclude,
     orderBy: args.orderBy ?? [{ createdAt: "desc" }],
   });
-  const availability = await loadAvailability(doctors.map((d) => d.id));
-  return doctors.map((doctor) => toDoctor(doctor, availability.get(doctor.id)));
+  const ids = doctors.map((d) => d.id);
+  const [availability, ratings] = await Promise.all([loadAvailability(ids), ratingsFor(ids)]);
+  return doctors.map((doctor) => toDoctor(doctor, availability.get(doctor.id), ratings.get(doctor.id)));
 }
 
 export async function findDoctor(id) {

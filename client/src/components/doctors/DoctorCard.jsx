@@ -1,5 +1,5 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, Check, Clock3, MapPin } from "lucide-react";
+import { ArrowUpRight, Check, Clock3, MapPin, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { doctorProfilePath, VERIFICATION_STATUS } from "../../constants.js";
 import { formatFee } from "../../utils/format.js";
@@ -36,6 +36,12 @@ export default function DoctorCard({ doctor, onBook, index }) {
             </Link>
             <p>{doctor.specialty}</p>
           </div>
+          {doctor.reviewCount > 0 && (
+            <span className="rating" title={`${doctor.reviewCount} patient reviews`}>
+              <Star size={13} fill="currentColor" /> {Number(doctor.rating).toFixed(1)}{" "}
+              <small>({doctor.reviewCount})</small>
+            </span>
+          )}
         </div>
         <div className="doctor-meta">
           <span>

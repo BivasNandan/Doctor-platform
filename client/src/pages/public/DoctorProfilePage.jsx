@@ -1,6 +1,7 @@
-import { ArrowLeft, ArrowUpRight, Check, MapPin, ShieldCheck } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ArrowLeft, ArrowUpRight, Check, MapPin, ShieldCheck, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import ReviewsSection from "../../components/reviews/ReviewsSection.jsx";
 import {
   Avatar,
   Button,
@@ -32,6 +33,8 @@ export default function DoctorProfilePage() {
   // Ignore a previously loaded profile while navigating between doctors.
   const doctor = data?.id === doctorId ? data : undefined;
   useDocumentTitle(doctor?.name);
+  // The reviews section knows the live rating (it changes when this patient posts a review).
+  const [liveSummary, setLiveSummary] = useState(null);
 
   // Returning from sign-in / email verification: reopen the booking for this doctor.
   const { user } = useAuth();
@@ -65,6 +68,8 @@ export default function DoctorProfilePage() {
   const feeAt = (clinic) => doctor.feesByFacility?.[clinic.id] ?? doctor.fee;
   const primaryClinic = clinics[0];
   const verified = doctor.verificationStatus === VERIFICATION_STATUS.VERIFIED;
+  const rating = liveSummary ? liveSummary.average : doctor.rating;
+  const reviewCount = liveSummary ? liveSummary.count : doctor.reviewCount;
 
   return (
     <>
@@ -83,6 +88,17 @@ export default function DoctorProfilePage() {
                   </Pill>
                 ) : (
                   <Pill tone="pending">{doctor.verificationStatus || "Verification status unavailable"}</Pill>
+                )}
+                {reviewCount > 0 && (
+                  <button
+                    type="button"
+                    className="rating rating-link"
+                    onClick={() => document.getElementById("reviews")?.scrollIntoView({ behavior: "smooth" })}
+                    aria-label={`${Number(rating).toFixed(1)} out of 5 from ${reviewCount} reviews. Show reviews`}
+                  >
+                    <Star size={13} fill="currentColor" /> {Number(rating).toFixed(1)}{" "}
+                    <small>({reviewCount})</small>
+                  </button>
                 )}
               </div>
               <h1>{doctor.name}</h1>
@@ -145,6 +161,7 @@ export default function DoctorProfilePage() {
               </div>
             ))}
           </section>
+          <ReviewsSection doctorId={doctor.id} onSummary={setLiveSummary} />
         </div>
         <aside className="booking-sticky surface">
           <span className="eyebrow">NEXT AVAILABLE</span>

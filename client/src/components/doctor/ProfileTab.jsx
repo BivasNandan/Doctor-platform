@@ -5,6 +5,7 @@ import { useCatalog } from "../../context/CatalogContext.jsx";
 import { useConfirm } from "../../context/ConfirmContext.jsx";
 import { doctorPortalService } from "../../services/index.js";
 import { readDoctorProfileForm } from "../../utils/forms.js";
+import ProfilePhotoEditor from "../account/ProfilePhotoEditor.jsx";
 import DoctorProfileFields, { validateDoctorProfile } from "../doctors/DoctorProfileFields.jsx";
 import { Button, Field, Notice, StatusPill } from "../ui/index.js";
 
@@ -66,6 +67,9 @@ export default function ProfileTab({ doctor, restricted, onSaved, onNotice }) {
 
   return (
     <>
+      <div className="admin-form surface">
+        <ProfilePhotoEditor onChanged={(updated) => onSaved({ ...doctor, image: updated.photoUrl ?? "" })} />
+      </div>
       <form className="admin-form surface" onSubmit={save} noValidate>
         <h2>
           Professional profile{" "}

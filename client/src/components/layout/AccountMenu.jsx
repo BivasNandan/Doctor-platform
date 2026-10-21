@@ -91,7 +91,7 @@ export default function AccountMenu() {
           >
             <div className="account-summary">
               <span className="account-avatar" aria-hidden="true">
-                {initials(account.name)}
+                {user?.photoUrl ? <img src={user.photoUrl} alt="" /> : initials(account.name)}
               </span>
               <span>
                 <strong>{account.name}</strong>

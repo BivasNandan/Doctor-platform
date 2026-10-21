@@ -3,6 +3,8 @@ import { prisma } from "../config/prisma.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { discardUpload, saveUpload, sendStoredFile } from "../services/files.js";
 import { LINKS, markGroupRead, notify, preview } from "../services/notifications.js";
+import { publish } from "../services/realtime.js";
+import { photoUrl } from "../models/user.js";
 import { ApiError, notFound, parse, uuid } from "../utils/errors.js";
 
 /**
@@ -65,16 +67,40 @@ const unreadWhere = (user) => ({
 const groupKeyOf = (conversationId) => `message:${conversationId}`;
 
 /** Tells whoever is on the other side of the conversation that something arrived. */
-async function announceMessage(conversation, sender, text) {
+const adminIds = async () =>
+  (
+    await prisma.user.findMany({ where: { role: "admin", accountStatus: "active" }, select: { id: true } })
+  ).map((admin) => admin.id);
+
+/** Everyone who has this conversation open or in their list (both people; every administrator for admin threads). */
+async function participants(conversation) {
+  return conversation.kind === "patient_doctor"
+    ? [
+        { id: conversation.doctor.userId, role: "doctor" },
+        { id: conversation.patientId, role: "patient" },
+      ]
+    : [
+        { id: conversation.doctor.userId, role: "doctor" },
+        ...(await adminIds()).map((id) => ({ id, role: "admin" })),
+      ];
+}
+
+async function announceMessage(conversation, sender, text, message) {
+  // Instant delivery first, before the slower bookkeeping: each person's open Messages page gets the message
+  // itself (as they would see it, so "mine" is right for the sender's other tabs too) and shows it at once.
+  for (const person of await participants(conversation))
+    publish(person.id, {
+      type: "message",
+      conversationId: conversation.id,
+      message: toMessage(message, person),
+    });
+
   const fromAdmin = sender.role === "admin";
   let recipients;
   if (conversation.kind === "patient_doctor")
     recipients = sender.role === "patient" ? [conversation.doctor.userId] : [conversation.patientId];
   else if (fromAdmin) recipients = [conversation.doctor.userId];
-  else
-    recipients = (
-      await prisma.user.findMany({ where: { role: "admin", accountStatus: "active" }, select: { id: true } })
-    ).map((admin) => admin.id);
+  else recipients = await adminIds();
 
   await notify(recipients, {
     kind: "message",
@@ -114,7 +140,7 @@ function participantFor(conversation, user) {
       participantId: conversation.doctor.id,
       participantRole: "doctor",
       participantName: conversation.doctor.user.name,
-      participantImage: conversation.doctor.image ?? "",
+      participantImage: photoUrl(conversation.doctor.user) ?? conversation.doctor.image ?? "",
     };
   if (conversation.kind === "doctor_admin")
     return {
@@ -127,7 +153,7 @@ function participantFor(conversation, user) {
     participantId: conversation.patient.id,
     participantRole: "patient",
     participantName: conversation.patient.name,
-    participantImage: "",
+    participantImage: photoUrl(conversation.patient) ?? "",
   };
 }
 
@@ -267,6 +293,16 @@ export const listMessages = async (request, response) => {
     data: { readAt: new Date() },
   });
   await markGroupRead(request.user.id, groupKeyOf(conversation.id));
+  // The sender's page flips "Sent" to "Read" immediately.
+  publish(
+    (await participants(conversation)).map((person) => person.id),
+    {
+      type: "read",
+      conversationId: conversation.id,
+      readerId: request.user.id,
+      readerRole: request.user.role,
+    },
+  );
   response.json(result);
 };
 
@@ -293,7 +329,7 @@ export const sendMessage = async (request, response) => {
     data: { conversationId: conversation.id, senderId: request.user.id, body },
     include: messageInclude,
   });
-  await announceMessage(conversation, request.user, preview(body));
+  await announceMessage(conversation, request.user, preview(body), message);
   response.status(201).json(toMessage(message, request.user));
 };
 
@@ -326,7 +362,7 @@ export const sendAttachment = async (request, response) => {
       },
       include: messageInclude,
     });
-    await announceMessage(conversation, request.user, `Sent a file: ${stored.fileName}`);
+    await announceMessage(conversation, request.user, `Sent a file: ${stored.fileName}`, message);
     response.status(201).json(toMessage(message, request.user));
   } catch (error) {
     await discardUpload(stored.storageKey);

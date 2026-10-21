@@ -175,7 +175,7 @@ export const requestDeactivation = async (request, response) => {
     kind: "doctor",
     title: "Deactivation request",
     body: `${request.user.name} asked to deactivate their account: "${short}"`,
-    link: LINKS.adminDoctors,
+    link: LINKS.adminDeactivations,
   });
   response.status(201).json({ status: "deactivation_requested" });
 };

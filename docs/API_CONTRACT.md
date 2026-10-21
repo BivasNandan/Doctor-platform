@@ -70,7 +70,7 @@ Patient accounts and password handling (all built and covered by `server/tests/a
 | 👤 | `PATCH /auth/me` | `{ name, phone? }` | `200 { user }` | Email and role cannot be changed here. |
 | 👤 | `POST /auth/change-password` | `{ currentPassword, newPassword }` | `200 { changed: true }` | Other devices are signed out; the current one stays signed in. |
 
-`user` = `{ id, role: "doctor"\|"admin"\|"patient", name?, email?, doctorId?, accountStatus? }`.
+`user` = `{ id, role: "doctor"\|"admin"\|"patient", name?, email?, doctorId?, accountStatus?, photoUrl? }` (`photoUrl` is set once the person has uploaded a profile photo).
 Blocked accounts (`deactivated`, `suspended`) must get `403 ACCOUNT_RESTRICTED` at login.
 
 ### Public discovery
@@ -82,6 +82,8 @@ Blocked accounts (`deactivated`, `suspended`) must get `403 ACCOUNT_RESTRICTED` 
 | 🌐 | `GET /doctors/:id/slots` | `facilityId`, `date` | `200 OpenSlot[]` (`{ id, label, status: "available"\|"booked"\|"passed" }`) |
 | 🌐 | `GET /clinics` | `type=clinic\|hospital` (optional) | `200 Facility[]` – active only |
 | 🌐 | `GET /specialties` | – | `200 Specialty[]` – active only |
+| 🌐 | `GET /doctors/:id/reviews` | `limit` (1–50, default 20), `offset` | `200 { summary: { average, count, distribution }, items: Review[], viewer: { canReview, myReview } }` |
+| 🌐 | `GET /photos/users/:id` | – | the image (see Profile photos) |
 | 🌐 | `POST /support-requests` | `{ message, email? }` | `201 { id, status: "received" }` |
 
 Rules:
@@ -90,6 +92,9 @@ Rules:
   `publicationStatus = published` and `accountStatus ≠ deactivated` are. A doctor can only be published when verified.
 - `location` matches the doctor's `location` text **or** the name/area/city of any of their clinics.
 - `OpenSlot.id` is the `availability_slots` id and `label` is its display start time (e.g. `"5:30 PM"`). The client sends the id back as `slotId`. Patients can only book slots that a doctor or admin created; the demo's fixed times exist only in demo mode.
+- `Doctor.image` and `Facility.image` are an absolute URL, a server path (`/api/v1/photos/users/<id>?v=…`) or a path relative to the website (`images/doctors/nusrat.karim.jpg`, a file in `client/public`); the client resolves relative paths with the site's base URL.
+- Every `Doctor` carries `rating` (average of the visible reviews, one decimal) and `reviewCount`; both are `0` until the first review, and the UI shows the rating only when `reviewCount > 0`. `Doctor.image` is the doctor's uploaded profile photo when they have one.
+- `POST /support-requests` also **emails the message to the Carewell mailbox** (`SUPPORT_EMAIL`, defaulting to `SMTP_USER`) with the sender's address as `Reply-To`, so replying in the mail program answers them. The request is saved and administrators are notified even if the email cannot be sent.
 - The demo derives `Doctor.availability` (`Today`/`Tomorrow`/`This week`) and `nextAvailable`; the real API should compute them from availability slots.
 
 ### Patient appointments
@@ -124,7 +129,7 @@ Rules:
 - Who talks to whom: **patient ↔ doctor** (only while the doctor has an accepted or completed appointment with that patient, otherwise `403 MESSAGING_NOT_ELIGIBLE`; either side may write first) and **doctor ↔ administration** (always open; one thread per doctor, shared by every administrator, created when the doctor account is created or registers).
 - Opening a conversation (`GET …/messages`) marks the other side's messages as read; `readAt` on your own messages shows when they were read.
 - Attachments: PDF, JPEG, PNG, WebP, GIF, ≤ 10 MB, type checked against the file's bytes, stored in the private bucket, downloaded only by participants.
-- **Live updates:** the client polls (conversations every ~8 s, the open conversation every ~4 s, paused while the tab is hidden). Push delivery (WebSocket/SSE) and presence (`online`) are not implemented.
+- **Live updates:** see [Live updates (Server-Sent Events)](#live-updates-server-sent-events). Polling (conversations ~8 s, the open conversation ~4 s, paused in hidden tabs) remains the fallback while the stream is down. Presence (`online`) is not implemented.
 
 ### Notifications (every role)
 
@@ -149,6 +154,59 @@ Rules:
 | New support request | every administrator |
 | Support status change or reply | the person who sent it (if signed in) |
 | Email verified, password changed or reset | that user |
+
+### Reviews and ratings
+
+| | Endpoint | Request | Success |
+| --- | --- | --- | --- |
+| 🌐 | `GET /doctors/:id/reviews` | `limit`, `offset` | `200 { summary, items, viewer }` (above) |
+| 👤 patient | `POST /doctors/:id/reviews` | `{ rating: 1–5, comment? (≤ 1000) }` | `201 Review` |
+| 👤 patient | `PATCH /reviews/:id` | `{ rating?, comment? }` (at least one) | `200 Review` |
+| 👤 patient | `DELETE /reviews/:id` | – | `204` |
+| 🛡️ | `GET /admin/reviews` | `status=visible\|hidden` (optional) | `200 ModerationReview[]` (newest first, up to 500) |
+| 🛡️ | `PATCH /admin/reviews/:id` | `{ status: "visible"\|"hidden" }` | `200 ModerationReview` |
+
+`Review` = `{ id, rating, comment, author, createdAt, updatedAt, mine? }`. `author` is shown as **"First L."** (never the full name or email); `mine: true` marks the signed-in patient's own review. `ModerationReview` = `{ id, doctorId, doctorName, patientName, patientEmail, rating, comment, status, createdAt }` (administrators see the full author).
+
+- A patient can review a doctor only after a **completed** appointment with that doctor (`403 REVIEW_NOT_ELIGIBLE`), **once** per doctor (`409 ALREADY_REVIEWED`; edit or delete the review instead). Deleting it lets them review again. `viewer.canReview` tells the page whether to show the form.
+- Reviews of unpublished doctors are readable only by that doctor and administrators (`404` for everyone else).
+- Hidden reviews disappear from the list and stop counting towards `rating`/`reviewCount`. Hide/restore is written to the audit log (`review.hide`, `review.restore`).
+- The doctor gets a "New N-star review" notification. Creating reviews is rate-limited (20 per hour per patient).
+- Someone else's review answers `404` on `PATCH`/`DELETE`, exactly like a missing one.
+
+### Profile photos (every role)
+
+| | Endpoint | Request | Success |
+| --- | --- | --- | --- |
+| 👤 | `POST /me/photo` | multipart field `file` (JPEG, PNG or WebP, ≤ 2 MB) | `200 { user }` (with `photoUrl`) |
+| 👤 | `DELETE /me/photo` | – | `200 { user }` (no `photoUrl`) |
+| 🌐/👤 | `GET /photos/users/:id` | – | the image, or `404` |
+
+- The file's bytes are checked against its declared type (`422 UNSUPPORTED_FILE`); a file over 2 MB is `413 FILE_TOO_LARGE`. Files live in the private bucket; replacing or removing a photo deletes the old file.
+- `photoUrl` looks like `/api/v1/photos/users/<id>?v=<timestamp>`; the `v` changes whenever the photo does, so browsers can cache it.
+- Who may view: **everyone** for a published doctor (`Cache-Control: public, max-age=86400`); otherwise the owner, administrators, and a doctor who has an appointment or conversation with that patient (`private, max-age=300`). Anyone else gets `404`, the same as for a person with no photo.
+- The photo appears on the doctor's card and profile, in the account menu and sidebar, in conversations, and in the administrators' patient list.
+
+### Live updates (Server-Sent Events)
+
+| | Endpoint | Success |
+| --- | --- | --- |
+| 👤 | `GET /events` | `200 text/event-stream`, kept open |
+
+The browser opens one stream after signing in (`EventSource` with cookies). The server writes an event the moment something happens, and the page reloads just that piece of data, so messages and notifications appear **instantly** instead of on the next poll.
+
+| Event (`event:` line) | `data` | Sent to | Page reaction |
+| --- | --- | --- | --- |
+| `ready` | `{ type: "ready" }` | the new connection | – |
+| `message` | `{ type: "message", conversationId, message }` where `message` is a `Message` as that person sees it (`isMine` is per recipient) | everyone in that conversation (including the sender's other tabs) | append the message at once, then refresh quietly |
+| `read` | `{ type: "read", conversationId, readerId, readerRole }` | everyone in that conversation | when the reader is the other side, "Sent" becomes "Read" at once |
+| `conversation` | `{ type: "conversation" }` | the patient and the doctor when an appointment is accepted | refresh the list |
+| `notification` | `{ type: "notification" }` | the person notified | refresh the bell |
+
+- `retry: 3000` makes the browser reconnect after a drop; a `: ping` comment every 20 s keeps proxies from closing an idle stream; `X-Accel-Buffering: no` stops nginx from buffering it. Each person may hold at most 5 streams (the oldest closes).
+- A `message` event carries the message itself so it shows immediately without another round trip; it is written only to the streams of the people in that conversation (never broadcast). `read` and `notification` events carry no content; the page fetches the details through the normal, permission-checked endpoints.
+- Pages poll slowly (30–60 s) while the stream is up and fall back to the old intervals when it is down.
+- Connections are registered in the memory of one server process. Running several servers needs a shared channel (for example Redis) behind `publish` in `server/src/services/realtime.js`.
 
 ### Doctor workspace (🩺)
 
@@ -187,6 +245,8 @@ Rules:
 | `GET /admin/specialties` | – | `200 Specialty[]` (including inactive) |
 | `POST /admin/specialties` | `{ name, slug, description }` | `201 Specialty` or `409 DUPLICATE_SPECIALTY` |
 | `PATCH /admin/specialties/:id` | `{ active: boolean }` | `200 Specialty` |
+| `GET /admin/patients` | `query` (name, email or phone), `status=active\|suspended` | `200 AdminPatient[]` (newest first, up to 500) |
+| `PATCH /admin/patients/:id/status` | `{ status: "active"\|"suspended" }` | `200 AdminPatient`; `404` for ids that are not patients |
 | `GET /admin/appointments` | – | `200 AppointmentRequest[]` (all) |
 | `PATCH /admin/appointments/:id` | `{ status }` | `200 AppointmentRequest` or `409 INVALID_TRANSITION` |
 | `GET /admin/availability` | `doctorId` | `200 AvailabilitySlot[]` |
@@ -196,6 +256,7 @@ Rules:
 
 - Unverifying (`rejected`/`suspended`/`pending`) a published doctor must also set `publicationStatus` to `unpublished`.
 - Admin appointment transitions: `pending → accepted \| rejected \| cancelled`, `accepted → cancelled \| completed`.
+- `AdminPatient` = `{ id, name, email, phone?, accountStatus, emailVerified, photoUrl?, appointmentCount, createdAt, lastSeenAt? }`. Suspending a patient signs them out on every device and blocks sign-in (`403 ACCOUNT_RESTRICTED`) until restored; their appointments, messages and reviews are kept. Logged as `patient.suspend` / `patient.restore`.
 - Write an **audit log** row for every admin decision (who, what, when, before/after).
 - `AdminSummary`: `{ pendingDoctors, verifiedDoctors, appointmentsToday, activeFacilities, activeSpecialties, monthlyAppointments: [{ month: "YYYY-MM", count }] }` (12 months, oldest first).
 
