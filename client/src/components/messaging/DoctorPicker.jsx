@@ -5,7 +5,10 @@ import { useId, useState } from "react";
 export default function DoctorPicker({ doctors, value, onChange }) {
   const listId = useId();
   const [open, setOpen] = useState(false);
-  const activeIndex = Math.max(0, doctors.findIndex((doctor) => String(doctor.id) === String(value)));
+  const activeIndex = Math.max(
+    0,
+    doctors.findIndex((doctor) => String(doctor.id) === String(value)),
+  );
   const selected = doctors.find((doctor) => String(doctor.id) === String(value));
 
   const handleKeyDown = (event) => {
@@ -45,7 +48,9 @@ export default function DoctorPicker({ doctors, value, onChange }) {
         }}
         type="button"
       >
-        <span className={selected ? "" : "glass-select-placeholder"}>{selected?.name ?? "Choose a doctor…"}</span>
+        <span className={selected ? "" : "glass-select-placeholder"}>
+          {selected?.name ?? "Choose a doctor…"}
+        </span>
         <ChevronDown aria-hidden="true" size={16} />
       </button>
       {open && doctors.length > 0 && (
