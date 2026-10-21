@@ -25,12 +25,24 @@ export default function DirectoryPage() {
 
   // Typing updates the URL immediately; the request waits until typing pauses.
   const debouncedFilters = useDebouncedValue(filters, 250);
-  const requestKey = JSON.stringify(debouncedFilters);
+  // Language filtering is client-side because the current service contract has no language field.
+  const serviceFilters = Object.fromEntries(
+    Object.entries(debouncedFilters).filter(([key]) => key !== "language"),
+  );
+  const requestKey = JSON.stringify(serviceFilters);
   const { data, loading, error, reload } = useResource(
     () => doctorService.list(JSON.parse(requestKey)),
     [requestKey],
   );
-  const doctors = useMemo(() => (data ? [...data].sort(SORTERS[sort]) : data), [data, sort]);
+  const doctors = useMemo(() => {
+    if (!data) return data;
+    const matchesLanguage = (doctor) =>
+      !filters.language ||
+      doctor.languages?.some(
+        (language) => language.toLocaleLowerCase() === filters.language.toLocaleLowerCase(),
+      );
+    return data.filter(matchesLanguage).sort(SORTERS[sort]);
+  }, [data, filters.language, sort]);
 
   return (
     <>

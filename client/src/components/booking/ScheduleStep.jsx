@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { isDemoMode } from "../../constants.js";
 import { localDateKey } from "../../utils/dates.js";
 import { ErrorState, SkeletonGrid } from "../ui/index.js";
 
@@ -30,6 +31,7 @@ export default function ScheduleStep({ date, time, onDate, onTime, slots }) {
         <em>works for you.</em>
       </h2>
       <p className="dialog-doctor">Times are shown in the clinic’s local time (BST, UTC+6)</p>
+      {isDemoMode && <p className="availability-disclosure">Demo appointment times are simulated.</p>}
       <div className="date-list" role="group" aria-label="Choose a date">
         {dates.map(({ key, day, date: dayOfMonth }) => (
           <button

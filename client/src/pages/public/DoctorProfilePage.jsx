@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowUpRight, Check, MapPin, ShieldCheck, Star } from "lucid
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import ReviewsSection from "../../components/reviews/ReviewsSection.jsx";
+import DoctorLanguages from "../../components/doctors/DoctorLanguages.jsx";
 import {
   Avatar,
   Button,
@@ -11,7 +12,7 @@ import {
   PageLoader,
   Pill,
 } from "../../components/ui/index.js";
-import { PATHS, ROLES, VERIFICATION_STATUS } from "../../constants.js";
+import { isDemoMode, PATHS, ROLES, VERIFICATION_STATUS } from "../../constants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useBooking } from "../../context/BookingContext.jsx";
 import { useCatalog } from "../../context/CatalogContext.jsx";
@@ -108,6 +109,7 @@ export default function DoctorProfilePage() {
               <p className="profile-location">
                 <MapPin size={16} /> {doctor.location}
               </p>
+              <DoctorLanguages languages={doctor.languages} />
               <div className="tag-row">
                 {doctor.qualifications.map((qualification) => (
                   <Pill key={qualification}>{qualification}</Pill>
@@ -167,6 +169,7 @@ export default function DoctorProfilePage() {
           <span className="eyebrow">NEXT AVAILABLE</span>
           <h3>{doctor.nextAvailable}</h3>
           {primaryClinic && <p>at {primaryClinic.name}</p>}
+          {isDemoMode && <p className="availability-disclosure">Availability shown is simulated.</p>}
           <div className="booking-price">
             <span>Consultation fee</span>
             <strong>{formatFee(primaryClinic ? feeAt(primaryClinic) : doctor.fee)}</strong>

@@ -3,6 +3,8 @@ export const POPULAR_SPECIALTY_IDS = ["cardiology", "dermatology", "dentistry", 
 
 export const AVAILABILITY_OPTIONS = ["Today", "Tomorrow", "This week"];
 
+export const LANGUAGE_OPTIONS = ["Bangla", "English", "Hindi", "Urdu"];
+
 export const FEE_RANGE = { min: 500, max: 3000, step: 100 };
 
 export const SORT_OPTIONS = [

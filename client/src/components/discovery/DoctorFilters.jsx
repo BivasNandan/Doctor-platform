@@ -1,6 +1,6 @@
 import { ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { formatFee } from "../../utils/format.js";
-import { AVAILABILITY_OPTIONS, FEE_RANGE } from "./searchOptions.js";
+import { AVAILABILITY_OPTIONS, FEE_RANGE, LANGUAGE_OPTIONS } from "./searchOptions.js";
 
 /**
  * Sidebar filters for the doctor directory.
@@ -43,6 +43,17 @@ export default function DoctorFilters({ filters, specialties, setFilter, onClear
             setFilter("maxFee", Number(event.target.value) >= FEE_RANGE.max ? "" : event.target.value)
           }
         />
+      </label>
+      <label className="filter-label">
+        Language
+        <select value={filters.language} onChange={(event) => setFilter("language", event.target.value)}>
+          <option value="">Any language</option>
+          {LANGUAGE_OPTIONS.map((language) => (
+            <option key={language} value={language}>
+              {language}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="filter-label">
         Availability

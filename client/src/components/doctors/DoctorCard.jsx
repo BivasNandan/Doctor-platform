@@ -1,9 +1,10 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, Check, Clock3, MapPin, Star } from "lucide-react";
 import { Link } from "react-router-dom";
-import { doctorProfilePath, VERIFICATION_STATUS } from "../../constants.js";
+import { doctorProfilePath, isDemoMode, VERIFICATION_STATUS } from "../../constants.js";
 import { formatFee } from "../../utils/format.js";
 import { Avatar, Button, Pill } from "../ui/index.js";
+import DoctorLanguages from "./DoctorLanguages.jsx";
 
 /** Summary card for one doctor in a grid. `onBook` receives the doctor. */
 export default function DoctorCard({ doctor, onBook, index }) {
@@ -27,6 +28,7 @@ export default function DoctorCard({ doctor, onBook, index }) {
           <i />
           {doctor.availability.includes("Today") ? "Available today" : doctor.nextAvailable}
         </span>
+        {isDemoMode && <span className="availability-simulated">Simulated availability</span>}
       </div>
       <div className="doctor-info">
         <div className="doctor-heading">
@@ -50,6 +52,7 @@ export default function DoctorCard({ doctor, onBook, index }) {
           <span>
             <MapPin size={14} /> {doctor.location}
           </span>
+          <DoctorLanguages languages={doctor.languages} />
         </div>
         <div className="tag-row">
           {verified && (

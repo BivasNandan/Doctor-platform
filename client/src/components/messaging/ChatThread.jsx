@@ -47,7 +47,15 @@ export default function ChatThread({
         {conversation && <Avatar src={conversation.participantImage} name={conversation.participantName} />}
         <span>
           <strong>{conversation?.participantName || "Choose a conversation"}</strong>
-          <small>{subtitle(conversation)}</small>
+          <small>
+            {subtitle(conversation)}
+            {typeof conversation?.online === "boolean" && (
+              <span className={`presence-status ${conversation.online ? "is-online" : "is-offline"}`}>
+                <i aria-hidden="true" />
+                {conversation.online ? "Online" : "Offline"}
+              </span>
+            )}
+          </small>
         </span>
       </header>
       <div className="chat-notice">
