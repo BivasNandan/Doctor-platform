@@ -106,15 +106,39 @@ export default function ReviewsSection({ doctorId, onSummary }) {
   const confirm = useConfirm();
   const { notify } = useToast();
   const [editing, setEditing] = useState(false);
-  const { data, loading, error, reload } = useResource(() => reviewService.list(doctorId), [doctorId]);
+  const { data, loading, error, reload, setData } = useResource(
+    () => reviewService.list(doctorId),
+    [doctorId],
+  );
 
   useEffect(() => {
     if (data) onSummary?.(data.summary);
   }, [data, onSummary]);
 
-  const saved = (message) => () => {
+  const saved = (message) => (review) => {
     setEditing(false);
     notify(message);
+    setData((current) => {
+      if (!current || !review) return current;
+      const previous = current.items.find((item) => item.mine);
+      const distribution = { ...current.summary.distribution };
+      if (previous) distribution[previous.rating] = Math.max(0, distribution[previous.rating] - 1);
+      distribution[review.rating] = (distribution[review.rating] ?? 0) + 1;
+      const count = current.summary.count + (previous ? 0 : 1);
+      const ratingTotal =
+        current.summary.average * current.summary.count - (previous?.rating ?? 0) + review.rating;
+      return {
+        ...current,
+        summary: {
+          ...current.summary,
+          average: count ? Math.round((ratingTotal / count) * 10) / 10 : 0,
+          count,
+          distribution,
+        },
+        items: [review, ...current.items.filter((item) => item.id !== review.id && !item.mine)],
+        viewer: { ...current.viewer, canReview: false, myReview: review },
+      };
+    });
     reload();
   };
 

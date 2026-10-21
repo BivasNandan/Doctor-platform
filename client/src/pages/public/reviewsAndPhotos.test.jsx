@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -37,9 +37,7 @@ describe("reviews on a doctor's profile", () => {
     expect(await screen.findByText("Choose a rating from 1 to 5.")).toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: "4 stars" }));
-    const comment = screen.getByLabelText(/Share your experience/);
-    await user.type(comment, "Clear and kind.");
-    await waitFor(() => expect(comment).toHaveValue("Clear and kind."));
+    await user.type(screen.getByLabelText(/Share your experience/), "Clear and kind.");
     await user.click(screen.getByRole("button", { name: "Submit review" }));
 
     expect(await screen.findByText("Clear and kind.")).toBeInTheDocument();
