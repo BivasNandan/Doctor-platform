@@ -1,11 +1,10 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowUpRight, Check, Clock3, Heart, MapPin, Star } from "lucide-react";
 import { Link } from "react-router-dom";
-import { doctorProfilePath, isDemoMode, VERIFICATION_STATUS } from "../../constants.js";
+import { doctorProfilePath, VERIFICATION_STATUS } from "../../constants.js";
 import { formatFee } from "../../utils/format.js";
 import { useFavorites } from "../../context/FavoritesContext.jsx";
 import { Avatar, Button, Pill } from "../ui/index.js";
-import DoctorLanguages from "./DoctorLanguages.jsx";
 
 /** Summary card for one doctor in a grid. `onBook` receives the doctor. */
 export default function DoctorCard({ doctor, onBook, index }) {
@@ -27,27 +26,28 @@ export default function DoctorCard({ doctor, onBook, index }) {
     >
       <div className="doctor-photo">
         <Avatar src={doctor.image} name={doctor.name} alt={doctor.name} />
-        <button
-          aria-label={isFavorite ? `Remove ${doctor.name} from saved doctors` : `Save ${doctor.name}`}
-          aria-pressed={isFavorite}
-          className={`favorite-button${isFavorite ? " is-favorite" : ""}`}
-          onClick={() => toggle(doctor.id)}
-          type="button"
-        >
-          <Heart aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} size={16} />
-        </button>
         <span className="availability">
           <i />
           {doctor.availability.includes("Today") ? "Available today" : doctor.nextAvailable}
         </span>
-        {isDemoMode && <span className="availability-simulated">Simulated availability</span>}
       </div>
       <div className="doctor-info">
         <div className="doctor-heading">
-          <div>
-            <Link className="doctor-name" to={doctorProfilePath(doctor.id)}>
-              {doctor.name}
-            </Link>
+          <div className="doctor-heading-title">
+            <div className="doctor-title-row">
+              <Link className="doctor-name" to={doctorProfilePath(doctor.id)}>
+                {doctor.name}
+              </Link>
+              <button
+                aria-label={isFavorite ? `Remove ${doctor.name} from saved doctors` : `Save ${doctor.name}`}
+                aria-pressed={isFavorite}
+                className={`favorite-button${isFavorite ? " is-favorite" : ""}`}
+                onClick={() => toggle(doctor.id)}
+                type="button"
+              >
+                <Heart aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} size={15} />
+              </button>
+            </div>
             <p>{doctor.specialty}</p>
           </div>
           {doctor.reviewCount > 0 && (
@@ -64,7 +64,6 @@ export default function DoctorCard({ doctor, onBook, index }) {
           <span>
             <MapPin size={14} /> {doctor.location}
           </span>
-          <DoctorLanguages languages={doctor.languages} />
         </div>
         <div className="tag-row">
           {verified && (

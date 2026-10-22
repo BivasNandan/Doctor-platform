@@ -58,32 +58,16 @@
   border-radius: 50%;
   background: var(--color-available);
 }
-.availability-simulated {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  padding: 4px 7px;
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-glass-border);
-  border-radius: 20px;
-  background: var(--color-glass-bg-strong);
-  backdrop-filter: blur(10px);
-  font-size: 10px;
-  font-weight: 600;
-}
 .favorite-button {
-  position: absolute;
-  top: 10px;
-  right: 10px;
   display: grid;
+  flex: 0 0 auto;
   place-items: center;
-  width: 31px;
-  height: 31px;
+  width: 27px;
+  height: 27px;
   color: var(--color-text-secondary);
-  border: 1px solid var(--color-glass-border);
+  border: 1px solid var(--color-border-default);
   border-radius: 50%;
-  background: var(--color-glass-bg-strong);
-  backdrop-filter: blur(10px);
+  background: var(--color-surface-primary);
   transition:
     color 0.18s,
     transform 0.18s;
@@ -99,6 +83,14 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 6px;
+}
+.doctor-heading-title {
+  min-width: 0;
+}
+.doctor-title-row {
+  display: flex;
+  align-items: center;
   gap: 6px;
 }
 .doctor-name {
