@@ -282,15 +282,6 @@
     top: 24px;
     right: 20px;
   }
-  .community-quote {
-    margin-top: 43px;
-  }
-  .community-quote h2 {
-    font-size: 29px;
-  }
-  .community-quote blockquote {
-    font-size: 15px;
-  }
   .directory-search {
     grid-template-columns: auto 1fr;
     gap: 7px;

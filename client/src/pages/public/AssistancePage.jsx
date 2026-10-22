@@ -46,7 +46,7 @@ export default function AssistancePage() {
             How can we <em>help?</em>
           </>
         }
-        description="A real person is here to make your care journey feel easier."
+        description="Send a message to the Carewell team. Include an email address if you’d like a reply."
       />
       <div className="assistance-grid">
         <div className="assistance-card surface">
@@ -55,7 +55,7 @@ export default function AssistancePage() {
           </span>
           <span className="eyebrow">TALK TO OUR TEAM</span>
           <h3>Let’s figure it out together.</h3>
-          <p>Tell us what’s on your mind. Our patient support team is available every day, 8am–10pm.</p>
+          <p>Tell us what’s on your mind. Include an email address if you’d like us to reply.</p>
           <form onSubmit={submit}>
             <Field
               label="Email for our reply"

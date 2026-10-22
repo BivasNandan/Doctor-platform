@@ -1,4 +1,5 @@
 import { ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { isDemoMode } from "../../constants.js";
 import { formatFee } from "../../utils/format.js";
 import { AVAILABILITY_OPTIONS, FEE_RANGE, LANGUAGE_OPTIONS } from "./searchOptions.js";
 
@@ -44,17 +45,19 @@ export default function DoctorFilters({ filters, specialties, setFilter, onClear
           }
         />
       </label>
-      <label className="filter-label">
-        Language
-        <select value={filters.language} onChange={(event) => setFilter("language", event.target.value)}>
-          <option value="">Any language</option>
-          {LANGUAGE_OPTIONS.map((language) => (
-            <option key={language} value={language}>
-              {language}
-            </option>
-          ))}
-        </select>
-      </label>
+      {isDemoMode && (
+        <label className="filter-label">
+          Language
+          <select value={filters.language} onChange={(event) => setFilter("language", event.target.value)}>
+            <option value="">Any language</option>
+            {LANGUAGE_OPTIONS.map((language) => (
+              <option key={language} value={language}>
+                {language}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="filter-label">
         Availability
         <select value={filters.available} onChange={(event) => setFilter("available", event.target.value)}>

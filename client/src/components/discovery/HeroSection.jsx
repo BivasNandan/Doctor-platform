@@ -3,12 +3,6 @@ import { assetUrl } from "../../utils/assets.js";
 /** Photos in /public/images (credits: docs/IMAGE_CREDITS.md). */
 export const HERO_IMAGE = "images/hero/hero-doctor.jpg";
 
-export const HERO_AVATARS = [
-  "images/people/patient-1.jpg",
-  "images/people/patient-2.jpg",
-  "images/people/patient-3.jpg",
-];
-
 /** Home-page hero. `doctor` is the profile highlighted in the floating card. */
 export default function HeroSection() {
   return (
@@ -31,19 +25,6 @@ export default function HeroSection() {
           Meet trusted doctors who listen, understand, and help you feel your best — wherever you are in your
           health journey.
         </p>
-        <div className="hero-proof">
-          <div className="avatar-stack">
-            {HERO_AVATARS.map((src) => (
-              <img key={src} src={assetUrl(src)} alt="" loading="lazy" />
-            ))}
-          </div>
-          <span>
-            <strong>
-              ★★★★★ <b>4.9/5</b>
-            </strong>
-            <small>Loved by 12,000+ patients</small>
-          </span>
-        </div>
       </div>
       <div className="hero-visual">
         <div className="hero-image-wrap">

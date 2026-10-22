@@ -38,6 +38,9 @@ export default function DetailsStep({
       <p className="dialog-doctor">
         {doctor.name} · {clinic?.name} · {date} at {time}
       </p>
+      <p className="availability-disclosure">
+        Submitting this request does not confirm an appointment. It remains pending until accepted.
+      </p>
       <div className="patient-form-grid">
         <Field label="Who is this appointment for?" className="field-wide">
           <select value={relationship} onChange={(event) => onRelationship(event.target.value)}>

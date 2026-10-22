@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import CareBanner from "../../components/discovery/CareBanner.jsx";
 import DiscoverSearch from "../../components/discovery/DiscoverSearch.jsx";
 import HeroSection from "../../components/discovery/HeroSection.jsx";
-import Testimonial from "../../components/discovery/Testimonial.jsx";
 import TrustStrip from "../../components/discovery/TrustStrip.jsx";
 import DoctorGrid from "../../components/doctors/DoctorGrid.jsx";
 import { ScrollReveal } from "../../components/ui/index.js";
@@ -34,9 +33,9 @@ export default function DiscoverPage() {
             <div>
               <span className="eyebrow">A GOOD PLACE TO BEGIN</span>
               <h2>
-                Doctors patients <em>love.</em>
+                Meet our <em>doctors.</em>
               </h2>
-              <p>A few of the kind, skilled people making a difference in Dhaka.</p>
+              <p>Explore doctors and review their profiles to find the care that fits your needs.</p>
             </div>
             <Link className="text-link" to={PATHS.doctors}>
               Explore all doctors <ArrowUpRight size={15} />
@@ -66,9 +65,6 @@ export default function DiscoverPage() {
       </ScrollReveal>
       <ScrollReveal>
         <CareBanner />
-      </ScrollReveal>
-      <ScrollReveal>
-        <Testimonial />
       </ScrollReveal>
     </>
   );

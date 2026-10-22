@@ -36,7 +36,6 @@ h3 {
 .section-heading h2 em,
 .hero h1 em,
 .care-banner h2 em,
-.community-quote h2 em,
 .profile-hero h1 em,
 .dialog-body h2 em {
   color: var(--color-brand-secondary);
@@ -112,6 +111,10 @@ h3 {
   font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
+  transition: color 0.18s ease;
+}
+.text-link svg {
+  transition: transform 0.18s ease;
 }
 .text-link:hover {
   color: var(--color-brand-secondary);
@@ -144,6 +147,12 @@ h3 {
 .pill-rating {
   color: #9a6500;
   background: #fff7df;
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .text-link:hover svg {
+    transform: translateX(2px);
+  }
 }
 
 /* ═══ ui ═══ */

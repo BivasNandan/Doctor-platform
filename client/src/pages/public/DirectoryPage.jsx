@@ -4,6 +4,7 @@ import DoctorFilters from "../../components/discovery/DoctorFilters.jsx";
 import { SORT_OPTIONS } from "../../components/discovery/searchOptions.js";
 import DoctorGrid from "../../components/doctors/DoctorGrid.jsx";
 import { Button, ScrollReveal, SectionHeading } from "../../components/ui/index.js";
+import { isDemoMode } from "../../constants.js";
 import { useBooking } from "../../context/BookingContext.jsx";
 import { useCatalog } from "../../context/CatalogContext.jsx";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
@@ -37,6 +38,7 @@ export default function DirectoryPage() {
   const doctors = useMemo(() => {
     if (!data) return data;
     const matchesLanguage = (doctor) =>
+      !isDemoMode ||
       !filters.language ||
       doctor.languages?.some(
         (language) => language.toLocaleLowerCase() === filters.language.toLocaleLowerCase(),
