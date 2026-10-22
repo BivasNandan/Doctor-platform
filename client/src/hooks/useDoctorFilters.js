@@ -8,6 +8,7 @@ export const DEFAULT_FILTERS = Object.freeze({
   location: "",
   language: "",
   maxFee: "",
+  minExperience: "",
   available: "",
   verified: false,
 });
@@ -25,6 +26,7 @@ export function useDoctorFilters() {
       location: params.get("location") ?? "",
       language: params.get("language") ?? "",
       maxFee: params.get("maxFee") ?? "",
+      minExperience: params.get("minExperience") ?? "",
       available: params.get("available") ?? "",
       verified: params.get("verified") === "true",
     }),

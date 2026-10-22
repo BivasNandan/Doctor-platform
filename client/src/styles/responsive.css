@@ -66,12 +66,6 @@
   .doctor-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .doctor-grid > :nth-child(3):last-child {
-    display: none;
-  }
-  .directory-grid > :nth-child(3):last-child {
-    display: block;
-  }
   .directory-layout {
     grid-template-columns: 190px minmax(0, 1fr);
     gap: 12px;
@@ -246,9 +240,6 @@
   .doctor-grid,
   .directory-grid {
     grid-template-columns: 1fr;
-  }
-  .doctor-grid > :nth-child(3):last-child {
-    display: block;
   }
   .doctor-photo {
     height: 190px;
@@ -654,6 +645,57 @@
   }
 }
 @media (max-width: 650px) {
+  .appointment-calendar {
+    padding: 10px;
+  }
+  .calendar-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .calendar-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .calendar-day {
+    min-height: 52px;
+    align-items: center;
+    padding: 4px 2px;
+  }
+  .calendar-events {
+    display: flex;
+    min-height: 7px;
+    justify-content: center;
+  }
+  .calendar-event {
+    width: 7px;
+    height: 7px;
+    overflow: hidden;
+    color: transparent;
+  }
+  .calendar-event i {
+    width: 7px;
+    height: 7px;
+  }
+  .calendar-event + .calendar-event,
+  .calendar-more {
+    display: none;
+  }
+  .consultation-preview-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+  .consultation-preview {
+    max-height: 92dvh;
+    overflow-y: auto;
+    padding: 16px;
+    border-radius: 16px 16px 0 0;
+  }
+  .consultation-stage {
+    min-height: 210px;
+  }
+  .signin-form .form-grid input {
+    font-size: 16px;
+  }
   .mobile-quick-nav {
     position: fixed;
     z-index: 22;

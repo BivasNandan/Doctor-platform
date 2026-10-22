@@ -1,0 +1,187 @@
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+
+const KEY = "carewell:language";
+const BN = {
+  "Help & support": "সহায়তা",
+  "Thoughtful care, closer to you": "মানবিক যত্ন, আপনার কাছাকাছি",
+  "CARE, CLOSER TO YOU": "আপনার কাছেই যত্ন",
+  "Find your doctor.": "আপনার ডাক্তার খুঁজুন।",
+  "Meet trusted specialists and find a time that works for you.":
+    "বিশ্বস্ত বিশেষজ্ঞ খুঁজুন এবং আপনার সুবিধামতো সময় বেছে নিন।",
+  "YOUR PERSONAL LIST": "আপনার পছন্দের তালিকা",
+  "Saved doctors.": "সংরক্ষিত ডাক্তার।",
+  Saved: "সংরক্ষিত",
+  "Find your": "খুঁজুন আপনার",
+  "doctor.": "ডাক্তার।",
+  "doctors.": "ডাক্তারদের।",
+  "Browse doctors": "ডাক্তার দেখুন",
+  "doctors found": "জন ডাক্তার পাওয়া গেছে",
+  "Doctors you’ve saved on this device.": "এই ডিভাইসে সংরক্ষিত ডাক্তাররা।",
+  Filters: "ফিল্টার",
+  "Clear all": "সব মুছুন",
+  Specialty: "বিশেষত্ব",
+  "All specialties": "সব বিশেষত্ব",
+  "Consultation fee": "পরামর্শ ফি",
+  Experience: "অভিজ্ঞতা",
+  "At least": "কমপক্ষে",
+  Any: "যেকোনো",
+  years: "বছর",
+  Language: "ভাষা",
+  "Any language": "যেকোনো ভাষা",
+  Availability: "সময়",
+  "Any time": "যেকোনো সময়",
+  "Platform verified": "প্ল্যাটফর্মে যাচাইকৃত",
+  "Search doctors": "ডাক্তার খুঁজুন",
+  "Doctor or specialty": "ডাক্তার বা বিশেষত্ব",
+  "Area or city": "এলাকা বা শহর",
+  "All locations": "সব এলাকা",
+  "Sort by": "সাজান",
+  Recommended: "প্রস্তাবিত",
+  "Lowest fee": "সর্বনিম্ন ফি",
+  "Most experienced": "সবচেয়ে অভিজ্ঞ",
+  "Appointments made simple.": "অ্যাপয়েন্টমেন্ট এখন সহজ।",
+  Appointments: "অ্যাপয়েন্টমেন্ট",
+  "made simple.": "এখন সহজ।",
+  "YOUR CARE, ALL IN ONE PLACE": "আপনার যত্ন, এক জায়গায়",
+  "Keep track of what’s coming up and revisit where you’ve been.":
+    "আসন্ন অ্যাপয়েন্টমেন্ট দেখুন এবং আগেরগুলো পর্যালোচনা করুন।",
+  "Book a visit": "সাক্ষাৎ বুক করুন",
+  All: "সব",
+  Pending: "অপেক্ষমাণ",
+  Accepted: "গৃহীত",
+  Rejected: "প্রত্যাখ্যাত",
+  Cancelled: "বাতিল",
+  History: "ইতিহাস",
+  List: "তালিকা",
+  Calendar: "ক্যালেন্ডার",
+  "Print receipt": "রসিদ প্রিন্ট করুন",
+  "Preview online room": "অনলাইন রুমের নমুনা",
+  Cancel: "বাতিল করুন",
+  "Request details": "অনুরোধের বিবরণ",
+  "Appointment details": "অ্যাপয়েন্টমেন্টের বিবরণ",
+  Doctor: "ডাক্তার",
+  Date: "তারিখ",
+  Time: "সময়",
+  Clinic: "ক্লিনিক",
+  "Booking status": "বুকিংয়ের অবস্থা",
+  Reference: "রেফারেন্স",
+  "No appointments on this day.": "এই দিনে কোনো অ্যাপয়েন্টমেন্ট নেই।",
+  "Select a day to see appointments": "অ্যাপয়েন্টমেন্ট দেখতে দিন বেছে নিন",
+  Week: "সপ্তাহ",
+  Month: "মাস",
+  Today: "আজ",
+  "Available clinics": "উপলভ্য ক্লিনিক",
+  "Choose a date": "তারিখ বেছে নিন",
+  "Choose a time": "সময় বেছে নিন",
+  "Request appointment": "অ্যাপয়েন্টমেন্টের অনুরোধ",
+  Back: "পেছনে",
+  Continue: "চালিয়ে যান",
+  "Sending…": "পাঠানো হচ্ছে…",
+  "Patient name": "রোগীর নাম",
+  "Phone number": "ফোন নম্বর",
+  "Email address": "ইমেইল ঠিকানা",
+  "Reason for visit": "সাক্ষাতের কারণ",
+  "Who is this appointment for?": "এই অ্যাপয়েন্টমেন্ট কার জন্য?",
+  "Filter appointments": "অ্যাপয়েন্টমেন্ট বাছাই",
+  "Choose a date in the calendar. Appointment status is shown with each entry.":
+    "ক্যালেন্ডারে তারিখ বেছে নিন। প্রতিটি অ্যাপয়েন্টমেন্টের অবস্থা দেখানো হয়েছে।",
+  "Choose a clinic": "ক্লিনিক বেছে নিন",
+  "Choose date & time": "তারিখ ও সময় বেছে নিন",
+  "Let’s make this happen": "চলুন শুরু করি",
+  "Date & time": "তারিখ ও সময়",
+  "Please choose a clinic to continue.": "চালিয়ে যেতে একটি ক্লিনিক বেছে নিন।",
+  "Choose a date and time to continue.": "চালিয়ে যেতে তারিখ ও সময় বেছে নিন।",
+  "A good first step": "শুরুটা হোক",
+  "starts with trust.": "বিশ্বাস দিয়ে।",
+  "Your selected doctor": "আপনার নির্বাচিত ডাক্তার",
+  "This is a request, not a confirmed appointment. The clinic will respond to confirm.":
+    "এটি একটি অনুরোধ, নিশ্চিত অ্যাপয়েন্টমেন্ট নয়। ক্লিনিক নিশ্চিত করে জানাবে।",
+  "Choose a place": "জায়গা বেছে নিন",
+  "that feels right.": "যা আপনার উপযুক্ত।",
+  "Appointment with": "অ্যাপয়েন্টমেন্ট",
+  "Select a clinic to continue": "চালিয়ে যেতে ক্লিনিক বেছে নিন",
+  "Pick a day that": "এমন একটি দিন বেছে নিন",
+  "works for you.": "যা আপনার সুবিধামতো।",
+  "Times are shown in the clinic’s local time (BST, UTC+6)":
+    "সময় ক্লিনিকের স্থানীয় সময়ে দেখানো হয় (BST, UTC+6)",
+  "Demo appointment times are simulated.": "ডেমো অ্যাপয়েন্টমেন্টের সময়গুলো নমুনা হিসেবে দেখানো হয়েছে।",
+  "Choose a date to see available times.": "উপলভ্য সময় দেখতে তারিখ বেছে নিন।",
+  "No times are available on this day.": "এই দিনে কোনো সময় উপলভ্য নেই।",
+  Booked: "বুকড",
+  Passed: "অতীত",
+  "A few details,": "আর কিছু তথ্য,",
+  "then you’re set.": "তারপর অনুরোধ সম্পন্ন।",
+  "Submitting this request does not confirm an appointment. It remains pending until accepted.":
+    "এই অনুরোধ পাঠালে অ্যাপয়েন্টমেন্ট নিশ্চিত হয় না। গ্রহণ না করা পর্যন্ত এটি অপেক্ষমাণ থাকবে।",
+  "Your full name": "আপনার পূর্ণ নাম",
+  "The patient’s full name": "রোগীর পূর্ণ নাম",
+  "A brief note to help your doctor prepare": "ডাক্তারকে প্রস্তুত হতে সাহায্য করার জন্য সংক্ষিপ্ত নোট",
+  "Phone and email are where the clinic will reach you about this appointment.":
+    "এই অ্যাপয়েন্টমেন্ট সম্পর্কে ক্লিনিক ফোন বা ইমেইলে যোগাযোগ করবে।",
+  "Your details are only used to prepare this appointment.":
+    "আপনার তথ্য শুধু এই অ্যাপয়েন্টমেন্টের প্রস্তুতিতে ব্যবহৃত হবে।",
+  "I’m looking for": "আমি খুঁজছি",
+  Around: "এলাকা",
+  "Doctor, specialty or clinic": "ডাক্তার, বিশেষত্ব বা ক্লিনিক",
+  "Area, city or postcode": "এলাকা, শহর বা পোস্টকোড",
+  POPULAR: "জনপ্রিয়",
+  "Find my doctor": "ডাক্তার খুঁজুন",
+  "Good care starts": "ভালো যত্নের শুরু",
+  "with the right": "সঠিক",
+  "connection.": "সংযোগে।",
+  "Meet trusted doctors who listen, understand, and help you feel your best — wherever you are in your health journey.":
+    "বিশ্বস্ত ডাক্তারদের খুঁজুন, যারা মনোযোগ দিয়ে শোনেন, বোঝেন এবং আপনার সুস্থতার পথে সহায়তা করেন।",
+  "CARE THAT MEETS YOU HERE": "আপনার কাছেই যত্ন",
+  "A LITTLE MORE HUMAN, BY DESIGN": "আরও মানবিক যত্ন",
+  "Care that feels right": "যত্ন হোক আপনার উপযুক্ত",
+  "YOUR NEXT STEP": "আপনার পরবর্তী পদক্ষেপ",
+  "Find care that feels right.": "আপনার উপযুক্ত যত্ন খুঁজুন।",
+  "A good place to start": "শুরু করার ভালো জায়গা",
+  Location: "অবস্থান",
+  "CONSULTATION FEE": "পরামর্শ ফি",
+  Myself: "নিজের জন্য",
+  "My child": "আমার সন্তানের জন্য",
+  "My parent": "আমার বাবা বা মায়ের জন্য",
+  "My spouse or partner": "আমার স্বামী/স্ত্রীর বা সঙ্গীর জন্য",
+  "My brother or sister": "আমার ভাই বা বোনের জন্য",
+  "Another family member": "পরিবারের অন্য সদস্যের জন্য",
+  "Nothing on the calendar yet": "ক্যালেন্ডারে এখনো কিছু নেই",
+  "When you book a visit, you’ll find the details here.": "সাক্ষাৎ বুক করলে তার বিবরণ এখানে দেখা যাবে।",
+  "Find a doctor": "ডাক্তার খুঁজুন",
+  "No matching doctors yet": "এখনো মিলে যাওয়া ডাক্তার নেই",
+  "No doctors saved yet": "এখনো কোনো ডাক্তার সংরক্ষণ করা হয়নি",
+  "Save a doctor with the heart button and they’ll appear here.":
+    "হার্ট বোতামে চাপ দিয়ে ডাক্তার সংরক্ষণ করুন; তারা এখানে দেখা যাবে।",
+};
+
+const LanguageContext = createContext(null);
+
+export function LanguageProvider({ children }) {
+  const [language, setLanguage] = useState(() => {
+    try {
+      return window.localStorage.getItem(KEY) === "bn" ? "bn" : "en";
+    } catch {
+      return "en";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(KEY, language);
+    } catch {
+      // The selected language remains active for this session when storage is unavailable.
+    }
+  }, [language]);
+
+  const value = useMemo(
+    () => ({ language, setLanguage, t: (text) => (language === "bn" ? (BN[text] ?? text) : text) }),
+    [language],
+  );
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+}
+
+export function useLanguage() {
+  const context = useContext(LanguageContext);
+  if (!context) throw new Error("useLanguage must be used inside <LanguageProvider>.");
+  return context;
+}

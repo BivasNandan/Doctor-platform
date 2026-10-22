@@ -7,6 +7,8 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { BookingProvider } from "./context/BookingContext.jsx";
 import { CatalogProvider } from "./context/CatalogContext.jsx";
 import { ConfirmProvider } from "./context/ConfirmContext.jsx";
+import { FavoritesProvider } from "./context/FavoritesContext.jsx";
+import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { RealtimeProvider } from "./context/RealtimeContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { ToastProvider } from "./context/ToastContext.jsx";
@@ -107,7 +109,11 @@ export function AppProviders({ children }) {
           <AuthProvider>
             <RealtimeProvider>
               <CatalogProvider>
-                <BookingProvider>{children}</BookingProvider>
+                <LanguageProvider>
+                  <FavoritesProvider>
+                    <BookingProvider>{children}</BookingProvider>
+                  </FavoritesProvider>
+                </LanguageProvider>
               </CatalogProvider>
             </RealtimeProvider>
           </AuthProvider>

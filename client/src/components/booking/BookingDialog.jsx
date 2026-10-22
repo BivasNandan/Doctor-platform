@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { PATHS } from "../../constants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useCatalog } from "../../context/CatalogContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { useToast } from "../../context/ToastContext.jsx";
 import { useResource } from "../../hooks/useResource.js";
 import { appointmentService, slotService } from "../../services/index.js";
@@ -21,6 +22,7 @@ const NEXT_LABELS = { 1: "Choose a clinic", 2: "Choose date & time", 3: "Continu
 
 /** Four-step appointment request wizard. Creates a *pending request*, never a confirmed visit. */
 export default function BookingDialog({ doctor, onClose }) {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { notify } = useToast();
   const { facilities } = useCatalog();
@@ -146,7 +148,7 @@ export default function BookingDialog({ doctor, onClose }) {
       noValidate
     >
       <div className="dialog-header">
-        <span className="eyebrow">LET’S MAKE THIS HAPPEN</span>
+        <span className="eyebrow">{t("Let’s make this happen")}</span>
         <button type="button" onClick={onClose} aria-label="Close booking dialog">
           <X size={19} />
         </button>
@@ -159,7 +161,7 @@ export default function BookingDialog({ doctor, onClose }) {
             aria-current={step === index + 1 ? "step" : undefined}
           >
             <i>{step > index + 1 ? <Check size={12} /> : `0${index + 1}`}</i>
-            <small>{label}</small>
+            <small>{t(label)}</small>
             {index < STEPS.length - 1 && <b />}
           </li>
         ))}
@@ -194,21 +196,21 @@ export default function BookingDialog({ doctor, onClose }) {
 
       <div className="dialog-footer">
         <span>
-          <small>CONSULTATION FEE</small>
+          <small>{t("CONSULTATION FEE")}</small>
           <strong>{formatFee(fee)}</strong>
         </span>
         {step > 1 && (
           <Button variant="outline" onClick={goBack} disabled={submitting}>
-            <ArrowLeft size={14} /> Back
+            <ArrowLeft size={14} /> {t("Back")}
           </Button>
         )}
         {step < 4 ? (
           <Button type="submit" disabled={step === 2 && !clinics.length}>
-            {NEXT_LABELS[step]} <ArrowRight size={15} />
+            {t(NEXT_LABELS[step])} <ArrowRight size={15} />
           </Button>
         ) : (
           <Button type="submit" disabled={submitting}>
-            {submitting ? "Sending…" : "Request appointment"} <Check size={15} />
+            {submitting ? t("Sending…") : t("Request appointment")} <Check size={15} />
           </Button>
         )}
       </div>

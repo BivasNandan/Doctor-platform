@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { doctorsSearchPath } from "../../constants.js";
 import { useCatalog } from "../../context/CatalogContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { Button } from "../ui/index.js";
 import { POPULAR_SPECIALTY_IDS } from "./searchOptions.js";
 
@@ -10,6 +11,7 @@ import { POPULAR_SPECIALTY_IDS } from "./searchOptions.js";
 export default function DiscoverSearch() {
   const navigate = useNavigate();
   const { specialties } = useCatalog();
+  const { t } = useLanguage();
   const [text, setText] = useState("");
   const [location, setLocation] = useState("");
   const [specialtyId, setSpecialtyId] = useState("");
@@ -38,18 +40,18 @@ export default function DiscoverSearch() {
     <section className="search-section">
       <div className="section-heading compact-heading">
         <div>
-          <span className="eyebrow">YOUR NEXT STEP</span>
-          <h2>Find care that feels right.</h2>
+          <span className="eyebrow">{t("YOUR NEXT STEP")}</span>
+          <h2>{t("Find care that feels right.")}</h2>
         </div>
         <span className="search-aside">
-          A good place to start <ArrowRight size={15} />
+          {t("A good place to start")} <ArrowRight size={15} />
         </span>
       </div>
       <form className="search-panel surface" onSubmit={submit} role="search">
         <label className="search-field">
           <Search size={19} />
           <span>
-            <small>I’m looking for</small>
+            <small>{t("I’m looking for")}</small>
             <input
               value={text}
               onChange={(event) => {
@@ -58,8 +60,8 @@ export default function DiscoverSearch() {
                 setShowSuggestions(true);
               }}
               onFocus={() => setShowSuggestions(true)}
-              placeholder="Doctor, specialty or clinic"
-              aria-label="Doctor, specialty or clinic"
+              placeholder={t("Doctor, specialty or clinic")}
+              aria-label={t("Doctor, specialty or clinic")}
             />
           </span>
           {showSuggestions && suggestions.length > 0 && (
@@ -86,23 +88,23 @@ export default function DiscoverSearch() {
         <label className="search-field">
           <MapPin size={19} />
           <span>
-            <small>Around</small>
+            <small>{t("Around")}</small>
             <input
               value={location}
               onChange={(event) => setLocation(event.target.value)}
-              placeholder="Area, city or postcode"
-              aria-label="Location"
+              placeholder={t("Area, city or postcode")}
+              aria-label={t("Location")}
             />
           </span>
           <ChevronDown size={15} />
         </label>
         <Button type="submit">
-          Find my doctor <ArrowUpRight size={16} />
+          {t("Find my doctor")} <ArrowUpRight size={16} />
         </Button>
       </form>
       {popular.length > 0 && (
         <div className="quick-search">
-          <span>POPULAR:</span>
+          <span>{t("POPULAR")}:</span>
           {popular.map((item) => (
             <button
               key={item.id}

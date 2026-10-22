@@ -1,7 +1,10 @@
-import { Clock3, MapPin } from "lucide-react";
-import { PATIENT_CANCELLABLE_STATUSES, relationshipTag } from "../../constants.js";
+import { Clock3, MapPin, Printer, Video } from "lucide-react";
+import { useState } from "react";
+import { APPOINTMENT_STATUS_LABELS, PATIENT_CANCELLABLE_STATUSES, relationshipTag } from "../../constants.js";
 import { parseDateKey } from "../../utils/dates.js";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { Avatar, StatusPill } from "../ui/index.js";
+import ConsultationPreview from "./ConsultationPreview.jsx";
 
 /**
  * One appointment request in the patient's list.
@@ -9,6 +12,17 @@ import { Avatar, StatusPill } from "../ui/index.js";
  */
 export default function AppointmentCard({ appointment, doctor, facility, onCancel }) {
   const date = parseDateKey(appointment.date);
+  const { language, t } = useLanguage();
+  const locale = language === "bn" ? "bn-BD" : "en";
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const printReceipt = (event) => {
+    const card = event.currentTarget.closest(".appointment-card");
+    card.classList.add("is-printing");
+    const cleanup = () => card.classList.remove("is-printing");
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 1000);
+  };
   return (
     <article className="appointment-card surface">
       <div className="appointment-date">
@@ -33,13 +47,21 @@ export default function AppointmentCard({ appointment, doctor, facility, onCance
       </div>
       <StatusPill status={appointment.status} />
       <div className="appointment-actions">
+        <button className="text-link" type="button" onClick={printReceipt}>
+          <Printer size={14} /> {t("Print receipt")}
+        </button>
+        {appointment.status === "accepted" && (
+          <button className="text-link" type="button" onClick={() => setPreviewOpen(true)}>
+            <Video size={14} /> {t("Preview online room")}
+          </button>
+        )}
         {PATIENT_CANCELLABLE_STATUSES.includes(appointment.status) && (
           <button className="text-link" type="button" onClick={() => onCancel(appointment.id)}>
-            Cancel
+            {t("Cancel")}
           </button>
         )}
         <details className="appointment-detail-more">
-          <summary>Request details</summary>
+          <summary>{t("Request details")}</summary>
           <p>
             Reference: {appointment.id}
             {appointment.simulated ? " (simulated)" : ""}
@@ -50,6 +72,38 @@ export default function AppointmentCard({ appointment, doctor, facility, onCance
           </p>
         </details>
       </div>
+      <section className="appointment-receipt" aria-label="Printable appointment confirmation">
+        <p className="eyebrow">CAREWELL · APPOINTMENT REQUEST</p>
+        <h1>{t("Appointment details")}</h1>
+        <dl>
+          <div>
+            <dt>{t("Doctor")}</dt>
+            <dd>{doctor?.name ?? "Doctor unavailable"}</dd>
+          </div>
+          <div>
+            <dt>{t("Date")}</dt>
+            <dd>{date.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" })}</dd>
+          </div>
+          <div>
+            <dt>{t("Time")}</dt>
+            <dd>{appointment.time}</dd>
+          </div>
+          <div>
+            <dt>{t("Clinic")}</dt>
+            <dd>{facility?.name ?? "Unavailable"}</dd>
+          </div>
+          <div>
+            <dt>{t("Booking status")}</dt>
+            <dd>{t(APPOINTMENT_STATUS_LABELS[appointment.status] ?? appointment.status)}</dd>
+          </div>
+          <div>
+            <dt>{t("Reference")}</dt>
+            <dd>{appointment.id}</dd>
+          </div>
+        </dl>
+        <p>A pending request is not a confirmed appointment. The clinic must accept it first.</p>
+      </section>
+      {previewOpen && <ConsultationPreview onClose={() => setPreviewOpen(false)} />}
     </article>
   );
 }

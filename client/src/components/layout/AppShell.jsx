@@ -7,12 +7,14 @@ import Footer from "./Footer.jsx";
 import MobileDrawer from "./MobileDrawer.jsx";
 import MobileQuickNav from "./MobileQuickNav.jsx";
 import { routeTitle } from "./navigation.js";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
 
 /** Chrome shared by every screen: sidebar, topbar, footer and mobile navigation. */
 export default function AppShell() {
   const { pathname } = useLocation();
+  const { language } = useLanguage();
   const reduceMotion = useReducedMotion();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const main = useRef(null);
@@ -42,7 +44,7 @@ export default function AppShell() {
       <Sidebar />
       <div className="main-column">
         <Topbar onOpenMenu={() => setDrawerOpen(true)} />
-        <main className="page-content" id="main-content" ref={main} tabIndex={-1}>
+        <main className="page-content" id="main-content" lang={language} ref={main} tabIndex={-1}>
           <motion.div
             key={pathname}
             initial={reduceMotion ? false : { opacity: 0, y: 6 }}

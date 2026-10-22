@@ -1,14 +1,17 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, Check, Clock3, MapPin, Star } from "lucide-react";
+import { ArrowUpRight, Check, Clock3, Heart, MapPin, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { doctorProfilePath, isDemoMode, VERIFICATION_STATUS } from "../../constants.js";
 import { formatFee } from "../../utils/format.js";
+import { useFavorites } from "../../context/FavoritesContext.jsx";
 import { Avatar, Button, Pill } from "../ui/index.js";
 import DoctorLanguages from "./DoctorLanguages.jsx";
 
 /** Summary card for one doctor in a grid. `onBook` receives the doctor. */
 export default function DoctorCard({ doctor, onBook, index }) {
   const reduceMotion = useReducedMotion();
+  const { doctorIds, toggle } = useFavorites();
+  const isFavorite = doctorIds.includes(doctor.id);
   const verified = doctor.verificationStatus === VERIFICATION_STATUS.VERIFIED;
   return (
     <motion.article
@@ -24,6 +27,15 @@ export default function DoctorCard({ doctor, onBook, index }) {
     >
       <div className="doctor-photo">
         <Avatar src={doctor.image} name={doctor.name} alt={doctor.name} />
+        <button
+          aria-label={isFavorite ? `Remove ${doctor.name} from saved doctors` : `Save ${doctor.name}`}
+          aria-pressed={isFavorite}
+          className={`favorite-button${isFavorite ? " is-favorite" : ""}`}
+          onClick={() => toggle(doctor.id)}
+          type="button"
+        >
+          <Heart aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} size={16} />
+        </button>
         <span className="availability">
           <i />
           {doctor.availability.includes("Today") ? "Available today" : doctor.nextAvailable}

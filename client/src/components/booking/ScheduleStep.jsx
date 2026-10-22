@@ -1,17 +1,18 @@
 import { Check } from "lucide-react";
 import { isDemoMode } from "../../constants.js";
 import { localDateKey } from "../../utils/dates.js";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { ErrorState, SkeletonGrid } from "../ui/index.js";
 
 /** The next seven calendar days, starting today. */
-function upcomingDates(count = 7) {
+function upcomingDates(locale, count = 7) {
   return Array.from({ length: count }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() + index);
     return {
       key: localDateKey(date),
-      day: date.toLocaleDateString("en", { weekday: "short" }),
-      date: date.toLocaleDateString("en", { day: "2-digit" }),
+      day: date.toLocaleDateString(locale, { weekday: "short" }),
+      date: date.toLocaleDateString(locale, { day: "2-digit" }),
     };
   });
 }
@@ -22,17 +23,18 @@ function upcomingDates(count = 7) {
  *   slots: {data?: import('../../types.js').OpenSlot[], loading: boolean, error: Error|null, reload: () => void}}} props
  */
 export default function ScheduleStep({ date, time, onDate, onTime, slots }) {
-  const dates = upcomingDates();
+  const { language, t } = useLanguage();
+  const dates = upcomingDates(language === "bn" ? "bn-BD" : "en");
   return (
     <div className="dialog-body">
       <h2 id="booking-title">
-        Pick a day that
+        {t("Pick a day that")}
         <br />
-        <em>works for you.</em>
+        <em>{t("works for you.")}</em>
       </h2>
-      <p className="dialog-doctor">Times are shown in the clinic’s local time (BST, UTC+6)</p>
-      {isDemoMode && <p className="availability-disclosure">Demo appointment times are simulated.</p>}
-      <div className="date-list" role="group" aria-label="Choose a date">
+      <p className="dialog-doctor">{t("Times are shown in the clinic’s local time (BST, UTC+6)")}</p>
+      {isDemoMode && <p className="availability-disclosure">{t("Demo appointment times are simulated.")}</p>}
+      <div className="date-list" role="group" aria-label={t("Choose a date")}>
         {dates.map(({ key, day, date: dayOfMonth }) => (
           <button
             type="button"
@@ -46,13 +48,13 @@ export default function ScheduleStep({ date, time, onDate, onTime, slots }) {
           </button>
         ))}
       </div>
-      {!date && <p className="privacy-note">Choose a date to see available times.</p>}
+      {!date && <p className="privacy-note">{t("Choose a date to see available times.")}</p>}
       {date && slots.loading && <SkeletonGrid count={2} />}
       {date && !slots.loading && slots.error && (
         <ErrorState error={slots.error} onRetry={slots.reload} title="Times couldn’t be loaded" />
       )}
       {date && !slots.loading && !slots.error && slots.data && (
-        <div className="time-list" role="group" aria-label="Choose a time">
+        <div className="time-list" role="group" aria-label={t("Choose a time")}>
           {slots.data.map((slot) => {
             const unavailable = slot.status !== "available";
             return (
@@ -66,12 +68,12 @@ export default function ScheduleStep({ date, time, onDate, onTime, slots }) {
               >
                 {slot.label}
                 {time === slot.label && <Check size={13} />}
-                {slot.status === "booked" && <small>Booked</small>}
-                {slot.status === "passed" && <small>Passed</small>}
+                {slot.status === "booked" && <small>{t("Booked")}</small>}
+                {slot.status === "passed" && <small>{t("Passed")}</small>}
               </button>
             );
           })}
-          {!slots.data.length && <p className="privacy-note">No times are available on this day.</p>}
+          {!slots.data.length && <p className="privacy-note">{t("No times are available on this day.")}</p>}
         </div>
       )}
     </div>

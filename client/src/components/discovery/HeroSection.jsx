@@ -1,29 +1,32 @@
 import { assetUrl } from "../../utils/assets.js";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 
 /** Photos in /public/images (credits: docs/IMAGE_CREDITS.md). */
 export const HERO_IMAGE = "images/hero/hero-doctor.jpg";
 
 /** Home-page hero. `doctor` is the profile highlighted in the floating card. */
 export default function HeroSection() {
+  const { t } = useLanguage();
   return (
     <section className="hero">
       <div className="hero-copy">
         <span className="eyebrow">
-          <i /> CARE THAT MEETS YOU HERE
+          <i /> {t("CARE THAT MEETS YOU HERE")}
         </span>
         <h1>
-          Good care starts
+          {t("Good care starts")}
           <br />
           with{" "}
           <em>
-            the right
+            {t("with the right")}
             <br />
-            connection.
+            {t("connection.")}
           </em>
         </h1>
         <p>
-          Meet trusted doctors who listen, understand, and help you feel your best — wherever you are in your
-          health journey.
+          {t(
+            "Meet trusted doctors who listen, understand, and help you feel your best — wherever you are in your health journey.",
+          )}
         </p>
       </div>
       <div className="hero-visual">
@@ -34,7 +37,7 @@ export default function HeroSection() {
         </div>
         <div className="hero-caption">
           <span>
-            <i /> A LITTLE MORE HUMAN, BY DESIGN
+            <i /> {t("A LITTLE MORE HUMAN, BY DESIGN")}
           </span>
           <span>01 / 03</span>
         </div>

@@ -1,7 +1,8 @@
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, CalendarDays, List, Plus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppointmentCard from "../../components/patient/AppointmentCard.jsx";
+import AppointmentCalendar from "../../components/patient/AppointmentCalendar.jsx";
 import {
   Button,
   EmptyState,
@@ -14,6 +15,7 @@ import { APPOINTMENT_STATUS_LABELS, PATHS } from "../../constants.js";
 import { useCatalog } from "../../context/CatalogContext.jsx";
 import { useConfirm } from "../../context/ConfirmContext.jsx";
 import { useToast } from "../../context/ToastContext.jsx";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { useResource } from "../../hooks/useResource.js";
 import { appointmentService } from "../../services/index.js";
 
@@ -29,9 +31,11 @@ const TABS = [
 export default function AppointmentsPage() {
   const navigate = useNavigate();
   const { notify } = useToast();
+  const { t } = useLanguage();
   const confirm = useConfirm();
   const { facilities } = useCatalog();
   const [tab, setTab] = useState("all");
+  const [view, setView] = useState("list");
   const appointments = useResource(() => appointmentService.list(), []);
 
   const cancel = async (id) => {
@@ -58,24 +62,39 @@ export default function AppointmentsPage() {
   return (
     <>
       <SectionHeading
-        eyebrow="YOUR CARE, ALL IN ONE PLACE"
+        eyebrow={t("YOUR CARE, ALL IN ONE PLACE")}
         title={
           <>
-            Appointments <em>made simple.</em>
+            {t("Appointments")} <em>{t("made simple.")}</em>
           </>
         }
-        description="Keep track of what’s coming up and revisit where you’ve been."
+        description={t("Keep track of what’s coming up and revisit where you’ve been.")}
         action={
           <Button onClick={() => navigate(PATHS.doctors)}>
-            <Plus size={15} /> Book a visit
+            <Plus size={15} /> {t("Book a visit")}
           </Button>
         }
       />
-      <Tabs tabs={TABS} value={tab} onChange={setTab} label="Filter appointments" />
+      <Tabs
+        tabs={TABS.map((item) => ({ ...item, label: t(item.label) }))}
+        value={tab}
+        onChange={setTab}
+        label={t("Filter appointments")}
+      />
+      <div className="appointment-view-toggle" role="group" aria-label="Appointment display">
+        <button type="button" aria-pressed={view === "list"} onClick={() => setView("list")}>
+          <List size={15} /> {t("List")}
+        </button>
+        <button type="button" aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>
+          <CalendarDays size={15} /> {t("Calendar")}
+        </button>
+      </div>
       {appointments.loading && !appointments.data ? (
         <PageLoader />
       ) : appointments.error && !appointments.data ? (
         <ErrorState error={appointments.error} onRetry={appointments.reload} />
+      ) : view === "calendar" ? (
+        <AppointmentCalendar appointments={visible} />
       ) : visible.length ? (
         <div className="appointment-list">
           {visible.map((item) => (
@@ -90,11 +109,11 @@ export default function AppointmentsPage() {
         </div>
       ) : (
         <EmptyState
-          title="Nothing on the calendar yet"
-          description="When you book a visit, you’ll find the details here."
+          title={t("Nothing on the calendar yet")}
+          description={t("When you book a visit, you’ll find the details here.")}
           action={
             <Button onClick={() => navigate(PATHS.doctors)}>
-              Find a doctor <ArrowRight size={15} />
+              {t("Find a doctor")} <ArrowRight size={15} />
             </Button>
           }
         />

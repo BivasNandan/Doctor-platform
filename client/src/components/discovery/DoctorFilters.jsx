@@ -1,27 +1,32 @@
 import { ShieldCheck, SlidersHorizontal } from "lucide-react";
-import { isDemoMode } from "../../constants.js";
+import { useLanguage } from "../../context/LanguageContext.jsx";
 import { formatFee } from "../../utils/format.js";
-import { AVAILABILITY_OPTIONS, FEE_RANGE, LANGUAGE_OPTIONS } from "./searchOptions.js";
+import { AVAILABILITY_OPTIONS, FEE_RANGE } from "./searchOptions.js";
 
 /**
  * Sidebar filters for the doctor directory.
  * @param {{filters: object, specialties: object[], setFilter: (key: string, value: unknown) => void, onClear: () => void}} props
  */
-export default function DoctorFilters({ filters, specialties, setFilter, onClear }) {
+export default function DoctorFilters({ filters, specialties, languages = [], setFilter, onClear }) {
+  const { t } = useLanguage();
   return (
     <aside className="filters-panel surface" aria-label="Filters">
       <div className="filter-head">
         <h3>
-          <SlidersHorizontal size={17} /> Filters
+          <SlidersHorizontal size={17} /> {t("Filters")}
         </h3>
         <button type="button" onClick={onClear}>
-          Clear all
+          {t("Clear all")}
         </button>
       </div>
       <label className="filter-label">
-        Specialty
-        <select value={filters.specialty} onChange={(event) => setFilter("specialty", event.target.value)}>
-          <option value="">All specialties</option>
+        {t("Specialty")}
+        <select
+          aria-label={t("Specialty")}
+          value={filters.specialty}
+          onChange={(event) => setFilter("specialty", event.target.value)}
+        >
+          <option value="">{t("All specialties")}</option>
           {specialties.map((item) => (
             <option key={item.id} value={item.id}>
               {item.name}
@@ -30,7 +35,7 @@ export default function DoctorFilters({ filters, specialties, setFilter, onClear
         </select>
       </label>
       <label className="filter-label">
-        Consultation fee
+        {t("Consultation fee")}
         <div className="range-copy">
           Up to <b>{filters.maxFee ? formatFee(filters.maxFee) : `${formatFee(FEE_RANGE.max)}+`}</b>
         </div>
@@ -45,12 +50,28 @@ export default function DoctorFilters({ filters, specialties, setFilter, onClear
           }
         />
       </label>
-      {isDemoMode && (
+      <label className="filter-label">
+        {t("Experience")}
+        <div className="range-copy">
+          {t("At least")} <b>{filters.minExperience ? `${filters.minExperience} ${t("years")}` : t("Any")}</b>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="30"
+          step="5"
+          value={filters.minExperience || 0}
+          onChange={(event) =>
+            setFilter("minExperience", event.target.value === "0" ? "" : event.target.value)
+          }
+        />
+      </label>
+      {languages.length > 0 && (
         <label className="filter-label">
-          Language
+          {t("Language")}
           <select value={filters.language} onChange={(event) => setFilter("language", event.target.value)}>
-            <option value="">Any language</option>
-            {LANGUAGE_OPTIONS.map((language) => (
+            <option value="">{t("Any language")}</option>
+            {languages.map((language) => (
               <option key={language} value={language}>
                 {language}
               </option>
@@ -59,9 +80,9 @@ export default function DoctorFilters({ filters, specialties, setFilter, onClear
         </label>
       )}
       <label className="filter-label">
-        Availability
+        {t("Availability")}
         <select value={filters.available} onChange={(event) => setFilter("available", event.target.value)}>
-          <option value="">Any time</option>
+          <option value="">{t("Any time")}</option>
           {AVAILABILITY_OPTIONS.map((option) => (
             <option key={option}>{option}</option>
           ))}
@@ -74,7 +95,7 @@ export default function DoctorFilters({ filters, specialties, setFilter, onClear
           onChange={(event) => setFilter("verified", event.target.checked)}
         />
         <span>
-          <ShieldCheck size={15} /> Platform verified
+          <ShieldCheck size={15} /> {t("Platform verified")}
         </span>
       </label>
     </aside>
