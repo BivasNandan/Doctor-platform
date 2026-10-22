@@ -1194,3 +1194,54 @@
     font-size: 16px;
   }
 }
+@media (max-width: 760px) {
+  .patient-dashboard-welcome {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .patient-dashboard-stats {
+    gap: 0.55rem;
+  }
+  .patient-dashboard-stat {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.8rem;
+  }
+  .patient-dashboard-stat small {
+    font-size: 0.72rem;
+  }
+  .patient-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .patient-dashboard-conversations {
+    grid-column: auto;
+  }
+  .patient-dashboard-situation {
+    flex-wrap: wrap;
+  }
+  .patient-dashboard-situation .button {
+    margin-left: 3.15rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .patient-dashboard-stats {
+    grid-template-columns: 1fr;
+  }
+  .patient-dashboard-stat {
+    align-items: center;
+    flex-direction: row;
+  }
+  .patient-dashboard-situation {
+    align-items: flex-start;
+  }
+  .patient-dashboard-appointment {
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0.75rem;
+  }
+  .patient-dashboard-appointment-info > span {
+    line-height: 1.4;
+  }
+}

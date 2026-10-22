@@ -2,6 +2,7 @@ import { Check, Save } from "lucide-react";
 import { useState } from "react";
 import ProfilePhotoEditor from "../../components/account/ProfilePhotoEditor.jsx";
 import ChangePasswordForm from "../../components/patient/ChangePasswordForm.jsx";
+import PatientDashboard from "../../components/patient/PatientDashboard.jsx";
 import { Button, Field, Notice, Pill, SectionHeading } from "../../components/ui/index.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { isValidPhone, PHONE_PATTERN } from "../../utils/validation.js";
@@ -39,6 +40,7 @@ export default function ProfilePage() {
 
   return (
     <>
+      <PatientDashboard />
       <SectionHeading
         eyebrow="YOUR ACCOUNT"
         title={
