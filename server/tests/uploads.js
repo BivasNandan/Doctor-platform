@@ -19,12 +19,13 @@ export async function upload(
   ctx,
   client,
   path,
-  { name = "certificate.pdf", type = "application/pdf", bytes = pdfBytes() } = {},
+  { name = "certificate.pdf", type = "application/pdf", bytes = pdfBytes(), kind } = {},
 ) {
   const cookie = Object.entries(client.cookies())
     .map(([key, value]) => `${key}=${value}`)
     .join("; ");
   const form = new FormData();
+  if (kind) form.append("kind", kind); // text fields go before the file, so the server has them when it reads it
   form.append("file", new Blob([bytes], { type }), name);
   const response = await fetch(`${ctx.baseUrl}${path}`, {
     method: "POST",

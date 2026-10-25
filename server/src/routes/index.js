@@ -1,8 +1,10 @@
 import { accountsRouter } from "./accounts.js";
 import { adminRouter } from "./admin.js";
+import { adminApplicationsRouter } from "./adminApplications.js";
 import { adminPatientsRouter } from "./adminPatients.js";
 import { adminReviewRouter } from "./adminReview.js";
 import { adminReviewsRouter } from "./adminReviews.js";
+import { applicationsRouter } from "./applications.js";
 import { authRouter } from "./auth.js";
 import { bookingRouter } from "./booking.js";
 import { catalogRouter } from "./catalog.js";
@@ -23,8 +25,10 @@ export function mountRoutes(api) {
   api.use("/auth", authRouter); // sign-in, sign-out, current user
   api.use("/auth", accountsRouter); // patient sign-up, email verification, password reset, profile
   api.use("/admin", adminReviewRouter); // administrator: certificates, deactivation and support requests (first: it answers GET /admin/doctors)
+  api.use("/admin", adminApplicationsRouter); // administrator: BMDC check, approve / changes / reject, invitations
   api.use("/admin", adminRouter); // administrator tools
   api.use(onboardingRouter); // doctors: /auth/doctor/register, /doctor/certificates, /doctor/account/deactivation-requests
+  api.use(applicationsRouter); // doctors: /doctor/application (+ submit, reopen), /auth/doctor/invitation
   api.use(messagingRouter); // /conversations, /attachments
   api.use(supportRouter); // /support-requests
   api.use(photosRouter); // /me/photo, /photos/users/:id (profile photos)

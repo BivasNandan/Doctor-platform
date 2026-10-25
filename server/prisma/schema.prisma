@@ -88,6 +88,32 @@ enum DeactivationStatus {
   declined
 }
 
+/// Where a doctor is in joining Carewell. Only `approved` doctors reach appointments and availability.
+///   invited (admin-created, link emailed) → in_progress → submitted → approved
+///   submitted → changes_requested → submitted again, or submitted → rejected (may reapply after 30 days)
+enum OnboardingStatus {
+  invited
+  in_progress
+  submitted
+  changes_requested
+  rejected
+  approved
+}
+
+/// The administrator's comparison of the uploaded BMDC certificate with the BMDC register.
+enum BmdcCheck {
+  unchecked
+  matched
+  not_found
+  mismatch
+}
+
+enum CertificateKind {
+  bmdc
+  degree
+  other
+}
+
 // ── Identity ───────────────────────────────────────────────────────────────────────────
 
 model User {
@@ -121,6 +147,8 @@ model User {
   supportRequests      SupportRequest[]
   auditEntries         AuditLog[]
   decidedDeactivations DeactivationRequest[] @relation("DeactivationDecider")
+  bmdcChecks           Doctor[]              @relation("BmdcChecker")
+  sentInvitations      DoctorInvitation[]    @relation("InvitationSender")
 
   @@index([name])
   @@map("users")
@@ -231,6 +259,17 @@ model Doctor {
   verificationStatus    VerificationStatus @default(pending) @map("verification_status")
   publicationStatus     PublicationStatus  @default(unpublished) @map("publication_status")
   profileReviewRequired Boolean            @default(false) @map("profile_review_required")
+  onboardingStatus      OnboardingStatus   @default(in_progress) @map("onboarding_status")
+  submittedAt           DateTime?          @map("submitted_at") @db.Timestamptz(3)
+  /// When the application was last approved, sent back or rejected.
+  decidedAt             DateTime?          @map("decided_at") @db.Timestamptz(3)
+  /// Shown to the doctor: what to change, or why the application was rejected.
+  decisionNote          String?            @map("decision_note")
+  bmdcCheck             BmdcCheck          @default(unchecked) @map("bmdc_check")
+  /// The administrator's own note about the BMDC check (not shown to the doctor).
+  bmdcCheckNote         String?            @map("bmdc_check_note")
+  bmdcCheckedAt         DateTime?          @map("bmdc_checked_at") @db.Timestamptz(3)
+  bmdcCheckedById       String?            @map("bmdc_checked_by_id") @db.Uuid
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -243,10 +282,32 @@ model Doctor {
   certificates         DoctorCertificate[]
   deactivationRequests DeactivationRequest[]
   reviews              Review[]
+  invitations          DoctorInvitation[]
+  bmdcCheckedBy        User?                 @relation("BmdcChecker", fields: [bmdcCheckedById], references: [id], onDelete: SetNull)
 
   @@index([specialtyId])
   @@index([verificationStatus, publicationStatus])
+  @@index([onboardingStatus])
   @@map("doctors")
+}
+
+/// Single-use link that lets a doctor added by an administrator set a password (store only a hash).
+model DoctorInvitation {
+  id          String    @id @default(uuid()) @db.Uuid
+  doctorId    String    @map("doctor_id") @db.Uuid
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(3)
+  usedAt      DateTime? @map("used_at") @db.Timestamptz(3)
+  /// Set when a newer invitation replaces this one.
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(3)
+  invitedById String?   @map("invited_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  doctor    Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  invitedBy User?  @relation("InvitationSender", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([doctorId])
+  @@map("doctor_invitations")
 }
 
 /// Which clinics a doctor practises at, with an optional per-clinic fee.
@@ -267,11 +328,13 @@ model DoctorClinic {
 
 /// Admin-reviewed evidence for verification (files live in object storage).
 model DoctorCertificate {
-  id         String   @id @default(uuid()) @db.Uuid
-  doctorId   String   @map("doctor_id") @db.Uuid
-  storageKey String   @map("storage_key")
-  fileName   String   @map("file_name")
-  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz(3)
+  id         String          @id @default(uuid()) @db.Uuid
+  doctorId   String          @map("doctor_id") @db.Uuid
+  storageKey String          @map("storage_key")
+  fileName   String          @map("file_name")
+  /// A BMDC registration certificate is required before an application can be submitted.
+  kind       CertificateKind @default(other)
+  uploadedAt DateTime        @default(now()) @map("uploaded_at") @db.Timestamptz(3)
 
   doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
 

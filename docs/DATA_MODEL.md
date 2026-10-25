@@ -31,7 +31,16 @@ User ──1:0..1── Doctor ──N:1── Specialty
   └── Conversation (patient + doctor, or doctor + admin) ──1:N── Message ──1:N── MessageAttachment
 
 Doctor ──1:N── DoctorCertificate · DeactivationRequest · Review ──N:1── User (patient)
+Doctor ──1:N── DoctorInvitation (single-use, 48-hour links for doctors an administrator adds)
 ```
+
+**Joining (doctor applications).** `Doctor.onboardingStatus` tracks the application: `invited → in_progress →
+submitted → approved`, or `submitted → changes_requested → submitted`, or `→ rejected` (reapply 30 days after
+`decidedAt`). Only `approved` doctors reach appointments and availability. `decisionNote` is the message shown to the
+doctor. `bmdcCheck` (+ `bmdcCheckNote`, `bmdcCheckedAt`, `bmdcCheckedById`) records an administrator's manual
+comparison of the BMDC certificate (`DoctorCertificate.kind = bmdc`) with the BMDC register; approval needs `matched`.
+The migration marks existing verified or suspended doctors `approved`, rejected ones `rejected`, and pending ones
+`submitted`.
 
 | Relationship | Delete behaviour | Why |
 | --- | --- | --- |

@@ -15,11 +15,13 @@ three kinds of users (patients, doctors and administrators), built with the PERN
 
 - **Patients:** search doctors, sign up with an emailed 6-digit code, book an appointment for yourself or a family
   member, follow and cancel requests, message your doctor after they accept, get notifications, contact support.
-- **Doctors:** register with certificates, accept or reject requests, manage availability and profile, message
-  patients and the administration, ask to deactivate the account.
-- **Administrators:** dashboard, verify and publish doctors, manage clinics, specialties, appointments and
-  availability, message any doctor, receive notifications. (Review of support requests and deactivation requests is
-  available in the API; its screens are not built yet.)
+- **Doctors:** apply to join (*Join as a doctor* in the footer: account, emailed code, profile, BMDC registration
+  certificate, submit) or accept an administrator's emailed invitation (48-hour link). Once approved: accept or reject
+  requests, manage availability and profile, message patients and the administration, ask to deactivate the account.
+- **Administrators:** dashboard, review doctor applications (compare the BMDC certificate with the BMDC register, then
+  approve, ask for changes or reject; rejected doctors may reapply after 30 days), invite doctors, publish doctors,
+  manage clinics, specialties, appointments, availability, patients, reviews, support and deactivation requests,
+  message any doctor, receive notifications.
 - **Notifications and messages** for all three roles refresh by themselves every few seconds.
 
 ## 1. Get the code
@@ -46,7 +48,9 @@ npm run dev
 ```
 
 Open <http://localhost:5173/Doctor-platform/>. This **demo mode** uses made-up data that resets when you reload, and
-any email and password signs in (choose *Doctor sign in* or *Administrator sign in* in the sidebar). Nothing is saved.
+any email and password signs in (choose *Doctor sign in* in the sidebar). Nothing is saved. The administrator sign-in
+is not linked anywhere: set `VITE_ADMIN_LOGIN_PATH` in the project-root `.env.local` (for example `/staff-demo`) and open
+<http://localhost:5173/Doctor-platform/#/staff-demo>.
 
 ## 3. Run the full app (real database, real accounts)
 
@@ -72,7 +76,8 @@ npm run dev        # starts the API (port 3000) and the website (port 5173) and 
 3. installs the packages of `server/` and `client/`,
 4. checks the database and the bucket, creates the tables, and creates the first **administrator**, the specialties and
    a few clinics,
-5. switches the website to use the real API (`client/.env.local`).
+5. switches the website to use the real API (`client/.env.local`) and gives the administrator sign-in page a
+   hard-to-guess address (`VITE_ADMIN_LOGIN_PATH` in `.env.local`), which it prints at the end.
 
 If a teammate sent you their `.env.local`, put it in the project root first and setup will not ask anything. It is
 safe to run again at any time.
@@ -80,12 +85,16 @@ safe to run again at any time.
 When `npm run dev` is ready, the website opens at <http://localhost:5173/Doctor-platform/> (use
 `npm run dev -- --no-open` to stop it from opening the browser). Press **Ctrl+C** once to stop both services.
 
-**Sign in as the administrator** with `SEED_ADMIN_EMAIL` (default `admin@carewell.test`) and `SEED_ADMIN_PASSWORD`,
-both in `.env.local`. A good first tour:
+**Sign in as the administrator** at `http://localhost:5173/Doctor-platform/#<VITE_ADMIN_LOGIN_PATH>` (the value in
+`.env.local`; the page is deliberately not linked from the site, and admin pages answer "Page not found" to
+everyone else) with `SEED_ADMIN_EMAIL` (default `admin@carewell.test`) and `SEED_ADMIN_PASSWORD`, both in
+`.env.local`. A good first tour:
 
-1. As admin, add a clinic if you want more, then **Doctors → Add doctor**, then verify and publish the doctor.
+1. As admin, add a clinic if you want more, then **Doctor management → Invite doctor**. The invitation email (or the
+   `[api]` window without SMTP) has the link to set a password. As that doctor, upload a BMDC certificate and submit;
+   back as admin, open **Verification**, record the BMDC check, **Approve**, then **Publish** in Doctor management.
 2. Open the site in a private window, **Create account** as a patient, enter the emailed code and book that doctor.
-3. Sign in as the doctor (set a password with *Forgot password*, or register a doctor yourself), accept the request
+3. Sign in as the doctor, accept the request
    and send a message. Watch the bell and the Messages page update on the patient's side.
 
 > **Never commit or post `.env.local`.** It gives full access to the database and the files. It is already ignored

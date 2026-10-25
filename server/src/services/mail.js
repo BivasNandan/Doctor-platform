@@ -79,3 +79,68 @@ export const sendPasswordResetEmail = ({ to, name, link, minutes }) =>
       `Hello ${name},\n\nWe received a request to reset your Carewell password. Open this link to choose a new one:\n\n${link}\n\n` +
       `The link works once and expires in ${minutes} minutes. If you did not ask for this, you can ignore this email; your password stays the same.${sign}`,
   });
+
+// ── Doctor applications ────────────────────────────────────────────────────────────────────
+export const sendDoctorInvitationEmail = ({ to, name, link, hours }) =>
+  sendMail({
+    to,
+    subject: "You are invited to join Carewell",
+    text:
+      `Hello ${name},\n\nThe Carewell administration has added you as a doctor. Open this link to choose your password:\n\n${link}\n\n` +
+      `The link works once and expires in ${hours} hours. After that, complete your profile and upload your BMDC registration certificate; ` +
+      `the administration checks it with the BMDC register before your profile is published.\n\n` +
+      `If you were not expecting this, you can ignore this email.${sign}`,
+  });
+
+export const sendApplicationReceivedEmail = ({ to, name }) =>
+  sendMail({
+    to,
+    subject: "We received your Carewell application",
+    text:
+      `Hello ${name},\n\nThank you for applying to Carewell. The administration will check your BMDC registration certificate ` +
+      `with the BMDC register and review your profile. We will email you when there is a decision.${sign}`,
+  });
+
+/** Tells one administrator that an application is waiting. */
+export const sendNewApplicationEmail = ({ to, doctorName, link }) =>
+  sendMail({
+    to,
+    subject: `[Carewell] New doctor application: ${doctorName}`,
+    text:
+      `${doctorName} submitted an application to join Carewell.\n\n` +
+      `Check the BMDC certificate against the BMDC register and decide in the administrator area:\n${link}`,
+  });
+
+const DECISIONS = {
+  approved: [
+    "Your Carewell application was approved",
+    (note) =>
+      `The administration checked your BMDC registration and approved your application. Your workspace is now open; ` +
+      `your profile becomes visible to patients once it is published.${note}`,
+  ],
+  changes_requested: [
+    "Your Carewell application needs changes",
+    (note) => `The administration asked for changes before it can approve your application.${note}\n\nSign in, make the changes and submit again.`,
+  ],
+  rejected: [
+    "Your Carewell application was not approved",
+    (note, reapplyDate) =>
+      `The administration could not approve your application.${note}\n\nYou can apply again from ${reapplyDate}.`,
+  ],
+};
+
+export const sendApplicationDecisionEmail = ({ to, name, decision, note, reapplyDate, link }) => {
+  const [subject, body] = DECISIONS[decision];
+  return sendMail({
+    to,
+    subject,
+    text: `Hello ${name},\n\n${body(note ? `\n\nMessage from the administration:\n${note}` : "", reapplyDate)}\n\n${link}${sign}`,
+  });
+};
+
+export const sendProfilePublishedEmail = ({ to, name, link }) =>
+  sendMail({
+    to,
+    subject: "Your Carewell profile is live",
+    text: `Hello ${name},\n\nYour profile is now visible on Carewell. Patients can find you and request appointments.\n\n${link}${sign}`,
+  });

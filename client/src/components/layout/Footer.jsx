@@ -17,6 +17,7 @@ export default function Footer() {
         >
           {language === "bn" ? "English" : "বাংলা"}
         </button>
+        <Link to={PATHS.doctorRegister}>{t("Join as a doctor")}</Link>
         <Link to={PATHS.assistance}>{t("Help & support")}</Link>
       </div>
     </footer>

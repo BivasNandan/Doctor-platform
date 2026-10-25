@@ -1,11 +1,11 @@
 import { LogOut } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import AvailabilityManager from "../../components/availability/AvailabilityManager.jsx";
 import ProfileTab from "../../components/doctor/ProfileTab.jsx";
 import RequestsTab from "../../components/doctor/RequestsTab.jsx";
 import { ErrorState, Notice, PageLoader, SectionHeading, Tabs } from "../../components/ui/index.js";
-import { isAccountRestricted, isDemoMode, PATHS } from "../../constants.js";
+import { isAccountRestricted, isDemoMode, ONBOARDING_STATUS, PATHS } from "../../constants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useResource } from "../../hooks/useResource.js";
 import { doctorPortalService } from "../../services/index.js";
@@ -32,6 +32,9 @@ export default function DoctorDashboardPage() {
 
   if (profile.error && !doctor) return <ErrorState error={profile.error} onRetry={profile.reload} />;
   if (!doctor) return <PageLoader label="Loading your workspace…" />;
+  // Until the administration approves the application, the application page is the workspace.
+  if (doctor.onboardingStatus && doctor.onboardingStatus !== ONBOARDING_STATUS.APPROVED)
+    return <Navigate to={PATHS.doctorApplication} replace />;
 
   return (
     <>

@@ -62,7 +62,8 @@ export function makePeople(ctx) {
     return { email, client: await signIn(email, "admin") };
   }
 
-  async function createDoctor(clinic, { published = true } = {}) {
+  /** A doctor who already joined (application approved). Pass `onboardingStatus` for an applicant. */
+  async function createDoctor(clinic, { published = true, onboardingStatus = "approved" } = {}) {
     const email = `doctor${++counter}@test.local`;
     const user = await ctx.prisma.user.create({
       data: {
@@ -80,6 +81,7 @@ export function makePeople(ctx) {
             location: "Banani",
             verificationStatus: published ? "verified" : "pending",
             publicationStatus: published ? "published" : "unpublished",
+            onboardingStatus,
             clinics: { create: [{ clinicId: clinic.id }] },
           },
         },

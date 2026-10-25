@@ -10,6 +10,7 @@ import {
   facilityService,
   messagingService,
   notificationService,
+  db,
   slotService,
 } from "./demoBackend.js";
 import { localDateKey } from "../utils/dates.js";
@@ -260,7 +261,12 @@ describe("admin rules", () => {
     await expect(adminService.setPublication("d6", "published")).rejects.toMatchObject({
       code: "NOT_VERIFIED",
     });
-    await adminService.setVerification("d6", "verified");
+    // d6 is an open application: it is verified only through the review, after a BMDC check.
+    await expect(adminService.setVerification("d6", "verified")).rejects.toMatchObject({
+      code: "APPLICATION_NOT_APPROVED",
+    });
+    await adminService.recordBmdcCheck("d6", { result: "matched" });
+    await adminService.approveApplication("d6");
     expect((await adminService.setPublication("d6", "published")).publicationStatus).toBe("published");
     expect((await doctorService.list()).map((d) => d.id)).toContain("d6");
 
@@ -334,18 +340,50 @@ describe("availability", () => {
 
     const saved = await availabilityService.save("d1", slot());
     await expect(
-      availabilityService.save("d1", slot({ startTime: "10:15", endTime: "10:45" })),
+      availabilityService.save("d1", slot({ startTime: "10:10", endTime: "10:40" })),
     ).rejects.toMatchObject({ code: "SLOT_OVERLAP" });
-    // A blocked slot frees the time.
-    await availabilityService.update(saved.id, { status: "unavailable" });
+    // Blocked slots free the time.
+    for (const item of saved) await availabilityService.update(item.id, { status: "unavailable" });
     await expect(
-      availabilityService.save("d1", slot({ startTime: "10:15", endTime: "10:45" })),
+      availabilityService.save("d1", slot({ startTime: "10:10", endTime: "10:40" })),
     ).resolves.toBeTruthy();
+  });
+
+  it("cuts a window into back-to-back 10-minute slots", async () => {
+    await signInDoctor();
+    const saved = await availabilityService.save("d1", slot({ startTime: "16:00", endTime: "16:30" }));
+    expect(saved.map((item) => `${item.startTime}-${item.endTime}`)).toEqual([
+      "16:00-16:10",
+      "16:10-16:20",
+      "16:20-16:30",
+    ]);
+    await expect(
+      availabilityService.save("d1", slot({ startTime: "17:00", endTime: "17:25" })),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it("shows patients each 10-minute time, and an accepted one as booked", async () => {
+    await signInDoctor();
+    await availabilityService.save("d1", slot({ startTime: "16:00", endTime: "16:30" }));
+    db.appointments.push({
+      id: "taken",
+      doctorId: "d1",
+      facilityId: "f1",
+      date: daysFromNow(3),
+      time: "4:10 PM",
+      status: "accepted",
+    });
+    const open = await slotService.listOpen({ doctorId: "d1", facilityId: "f1", date: daysFromNow(3) });
+    expect(open.map((item) => [item.label, item.status])).toEqual([
+      ["4:00 PM", "available"],
+      ["4:10 PM", "booked"],
+      ["4:20 PM", "available"],
+    ]);
   });
 
   it("keeps doctors out of each other's schedules but lets admins manage any", async () => {
     await signInDoctor();
-    const mine = await availabilityService.save("d1", slot());
+    const [mine] = await availabilityService.save("d1", slot());
     await authService.logout();
     await signInAdmin();
     expect((await availabilityService.list("d1", { admin: true })).map((s) => s.id)).toContain(mine.id);
@@ -455,5 +493,103 @@ describe("messaging", () => {
     const threads = await messagingService.listConversations();
     expect(threads).toHaveLength(1);
     expect(threads[0]).toMatchObject({ id: "c-admin", canMessage: true });
+  });
+});
+
+describe("doctor applications", () => {
+  const bmdcFile = () => new File(["%PDF-1.4"], "bmdc.pdf", { type: "application/pdf" });
+  const register = () =>
+    authService.registerDoctor({
+      name: "Dr. New Applicant",
+      email: "applicant@example.test",
+      phone: "+8801711000000",
+      password: "doctor-pass-123",
+      specialtyId: "cardiology",
+      qualifications: ["MBBS"],
+      experienceYears: 4,
+      fee: 900,
+      location: "Dhaka",
+      facilityIds: ["f1"],
+    });
+
+  it("goes in order: confirm email, BMDC certificate, submit", async () => {
+    const { user } = await register();
+    expect(user).toMatchObject({ onboardingStatus: "in_progress", emailVerified: false });
+    await expect(doctorPortalService.listAppointments()).rejects.toMatchObject({
+      code: "APPLICATION_NOT_APPROVED",
+    });
+    await expect(doctorPortalService.submitApplication()).rejects.toMatchObject({
+      code: "EMAIL_NOT_VERIFIED",
+    });
+
+    await authService.verifyEmail(DEMO_VERIFICATION_CODE);
+    await expect(doctorPortalService.submitApplication()).rejects.toMatchObject({
+      code: "BMDC_CERTIFICATE_REQUIRED",
+    });
+    await doctorPortalService.uploadCertificate(bmdcFile(), "bmdc");
+    expect((await doctorPortalService.getApplication()).canSubmit).toBe(true);
+
+    const submitted = await doctorPortalService.submitApplication();
+    expect(submitted.status).toBe("submitted");
+    await expect(doctorPortalService.uploadCertificate(bmdcFile(), "degree")).rejects.toMatchObject({
+      code: "APPLICATION_LOCKED",
+    });
+  });
+
+  it("approves only after a matched BMDC check, and sends back or rejects with a note", async () => {
+    const { doctor } = await register();
+    await authService.verifyEmail(DEMO_VERIFICATION_CODE);
+    await doctorPortalService.uploadCertificate(bmdcFile(), "bmdc");
+    await doctorPortalService.submitApplication();
+    await authService.logout();
+
+    await signInAdmin();
+    await expect(adminService.approveApplication(doctor.id)).rejects.toMatchObject({
+      code: "BMDC_NOT_MATCHED",
+    });
+    await expect(adminService.recordBmdcCheck(doctor.id, { result: "mismatch" })).rejects.toMatchObject({
+      status: 422,
+    });
+    await expect(adminService.requestApplicationChanges(doctor.id, "")).rejects.toMatchObject({
+      status: 422,
+    });
+    const sentBack = await adminService.requestApplicationChanges(doctor.id, "Upload a clearer scan.");
+    expect(sentBack.application).toMatchObject({
+      status: "changes_requested",
+      note: "Upload a clearer scan.",
+    });
+
+    const rejected = await adminService.rejectApplication(doctor.id, "Not on the BMDC register.");
+    expect(rejected.application.status).toBe("rejected");
+    expect(rejected.application.reapplyAt).toBeTruthy();
+    await authService.logout();
+
+    await authService.login(credentials("doctor", "applicant@example.test"));
+    await expect(doctorPortalService.reopenApplication()).rejects.toMatchObject({ code: "REAPPLY_TOO_SOON" });
+  });
+
+  it("invites a doctor with a single link that sets the password", async () => {
+    await signInAdmin();
+    const invited = await adminService.addDoctor({
+      name: "Prof. Senior Doctor",
+      email: "senior@example.test",
+      specialtyId: "cardiology",
+      qualifications: ["MBBS", "FRCP"],
+      experienceYears: 30,
+      fee: 3000,
+      location: "Dhaka",
+      facilityIds: ["f1"],
+    });
+    expect(invited.application.status).toBe("invited");
+    const hours = (new Date(invited.application.invitationExpiresAt) - Date.now()) / 3_600_000;
+    expect(hours).toBeGreaterThan(47);
+    expect(hours).toBeLessThanOrEqual(48);
+    await authService.logout();
+
+    const token = invited.simulatedInvitationToken;
+    expect((await authService.getInvitation(token)).email).toBe("senior@example.test");
+    const { user } = await authService.acceptInvitation({ token, password: "senior-pass-1" });
+    expect(user).toMatchObject({ onboardingStatus: "in_progress", emailVerified: true });
+    await expect(authService.getInvitation(token)).rejects.toMatchObject({ status: 410 });
   });
 });

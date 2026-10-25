@@ -1,5 +1,6 @@
 import { prisma } from "../config/prisma.js";
 import { discardUpload, saveUpload } from "./files.js";
+import { userDoctorSelect } from "../models/user.js";
 
 export const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 export const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
@@ -11,7 +12,7 @@ export async function setUserPhoto(user, file) {
     const updated = await prisma.user.update({
       where: { id: user.id },
       data: { photoKey: stored.storageKey, photoUpdatedAt: new Date() },
-      include: { doctor: { select: { id: true } } },
+      include: { doctor: { select: userDoctorSelect } },
     });
     if (user.photoKey) await discardUpload(user.photoKey);
     return updated;
@@ -26,7 +27,7 @@ export async function clearUserPhoto(user) {
   const updated = await prisma.user.update({
     where: { id: user.id },
     data: { photoKey: null, photoUpdatedAt: null },
-    include: { doctor: { select: { id: true } } },
+    include: { doctor: { select: userDoctorSelect } },
   });
   if (user.photoKey) await discardUpload(user.photoKey);
   return updated;

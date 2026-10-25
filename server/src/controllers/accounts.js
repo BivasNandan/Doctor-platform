@@ -1,9 +1,9 @@
-import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { toUser } from "../models/user.js";
+import { toUser, userDoctorSelect } from "../models/user.js";
 import {
   hashPassword,
   revokeAllSessions,
@@ -11,7 +11,8 @@ import {
   startSession,
   verifyPassword,
 } from "../services/auth.js";
-import { sendPasswordResetEmail, sendVerificationEmail } from "../services/mail.js";
+import { codeHash, issueVerificationCode } from "../services/emailCodes.js";
+import { sendPasswordResetEmail } from "../services/mail.js";
 import { LINKS, notify } from "../services/notifications.js";
 import { ApiError, parse } from "../utils/errors.js";
 
@@ -20,7 +21,6 @@ import { ApiError, parse } from "../utils/errors.js";
  * password change. Mounted at /api/v1/auth next to the sign-in routes.
  */
 
-const CODE_MINUTES = 15;
 const MAX_CODE_ATTEMPTS = 5;
 const RESEND_SECONDS = 30;
 const RESET_MINUTES = 60;
@@ -30,7 +30,7 @@ const BLOCKED = ["suspended", "deactivated"];
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const sameHash = (a, b) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const minutesFromNow = (minutes) => new Date(Date.now() + minutes * 60 * 1000);
-const withDoctor = { doctor: { select: { id: true } } };
+const withDoctor = { doctor: { select: userDoctorSelect } };
 
 // ── Shared field rules (the client checks the same things for fast feedback) ──────────────
 const name = z.string().trim().min(2, "Enter your full name.").max(120, "That name is too long.");
@@ -49,26 +49,6 @@ const newPassword = z
   .string()
   .min(8, "Use at least 8 characters.")
   .refine((value) => Buffer.byteLength(value) <= 72, "Use at most 72 characters.");
-
-// ── Email verification codes ──────────────────────────────────────────────────────────────
-// A 6-digit code is only safe because it is single-use, short-lived and limited to a few
-// guesses; the database keeps a hash, never the code.
-const codeHash = (userId, code) => sha256(`${userId}:${code}`);
-
-/** Replaces any older code with a fresh one and emails it. */
-async function issueVerificationCode(user) {
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  await prisma.$transaction([
-    prisma.emailVerification.updateMany({
-      where: { userId: user.id, consumedAt: null },
-      data: { consumedAt: new Date() },
-    }),
-    prisma.emailVerification.create({
-      data: { userId: user.id, codeHash: codeHash(user.id, code), expiresAt: minutesFromNow(CODE_MINUTES) },
-    }),
-  ]);
-  void sendVerificationEmail({ to: user.email, name: user.name, code, minutes: CODE_MINUTES });
-}
 
 // ── POST /auth/patient/register ───────────────────────────────────────────────────────────
 const registerSchema = z.object({ name, email, phone, password: newPassword });
@@ -134,12 +114,22 @@ export const verifyEmail = async (request, response) => {
       include: withDoctor,
     }),
   ]);
-  await notify(user.id, {
-    kind: "account",
-    title: "Email verified",
-    body: "Welcome to Carewell! You can now book appointments.",
-    link: "/discover",
-  });
+  await notify(
+    user.id,
+    user.role === "doctor"
+      ? {
+          kind: "account",
+          title: "Email verified",
+          body: "Next, upload your BMDC registration certificate and submit your application.",
+          link: LINKS.doctorApplication,
+        }
+      : {
+          kind: "account",
+          title: "Email verified",
+          body: "Welcome to Carewell! You can now book appointments.",
+          link: "/discover",
+        },
+  );
   response.json({ user: toUser(verified) });
 };
 
@@ -215,6 +205,12 @@ export const resetPassword = async (request, response) => {
   await prisma.user.updateMany({
     where: { id: reset.userId, emailVerifiedAt: null },
     data: { emailVerifiedAt: new Date() },
+  });
+  // An invited doctor who used "forgot password" instead of the invitation link has now set up
+  // their account all the same.
+  await prisma.doctor.updateMany({
+    where: { userId: reset.userId, onboardingStatus: "invited" },
+    data: { onboardingStatus: "in_progress" },
   });
   await revokeAllSessions(reset.userId); // anyone using the old password is signed out
   await notify(reset.userId, {

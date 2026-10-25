@@ -8,7 +8,6 @@ import {
   ListFilter,
   LogIn,
   MessageCircle,
-  Plus,
   ShieldCheck,
   Star,
   Stethoscope,
@@ -66,7 +65,9 @@ const ROUTE_TITLES = [
   [PATHS.resetPassword, "Reset password"],
   [PATHS.profile, "Your profile"],
   [PATHS.doctorLogin, "Doctor sign in"],
-  [PATHS.doctorRegister, "Doctor registration"],
+  [PATHS.doctorRegister, "Join as a doctor"],
+  [PATHS.doctorApplication, "Doctor application"],
+  [PATHS.doctorInvitation, "Doctor invitation"],
   [PATHS.doctorDashboard, "Doctor workspace"],
   [PATHS.adminLogin, "Administrator sign in"],
   [PATHS.admin, "Overview"],
@@ -83,7 +84,9 @@ const ROUTE_TITLES = [
 ];
 
 export function routeTitle(pathname) {
-  const match = ROUTE_TITLES.find(([pattern]) => matchPath({ path: pattern, end: true }, pathname));
+  const match = ROUTE_TITLES.find(
+    ([pattern]) => pattern && matchPath({ path: pattern, end: true }, pathname),
+  );
   return match?.[1] ?? "Page not found";
 }
 
@@ -110,13 +113,10 @@ const PATIENT_ACCOUNT_GROUP = {
   items: [{ to: PATHS.profile, label: "My profile", icon: UserRound }],
 };
 
+// "Join as a doctor" is deliberately not here: it is linked from the footer and the doctor sign-in page.
 const GUEST_GROUP = {
   label: "FOR PROFESSIONALS",
-  items: [
-    { to: PATHS.doctorRegister, label: "Doctor registration", icon: Plus },
-    { to: PATHS.doctorLogin, label: "Doctor sign in", icon: Users },
-    { to: PATHS.adminLogin, label: "Administrator sign in", icon: ShieldCheck },
-  ],
+  items: [{ to: PATHS.doctorLogin, label: "Doctor sign in", icon: Users }],
 };
 
 const DOCTOR_GROUP = {

@@ -119,7 +119,7 @@ export default function LoginPage({ portal }) {
           )}
           {portal === ROLES.DOCTOR && (
             <Link className="button button-outline" to={PATHS.doctorRegister}>
-              Register as a doctor
+              Join as a doctor
             </Link>
           )}
           <Button type="submit" disabled={busy}>

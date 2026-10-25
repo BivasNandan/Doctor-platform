@@ -3,6 +3,10 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 const KEY = "carewell:language";
 const BN = {
   "Help & support": "সহায়তা",
+  "Join as a doctor": "ডাক্তার হিসেবে যোগ দিন",
+  "This time is already booked. Choose another time.":
+    "এই সময়টি ইতিমধ্যে বুক করা হয়েছে। অন্য সময় বেছে নিন।",
+  "This time has already passed.": "এই সময়টি পেরিয়ে গেছে।",
   "Thoughtful care, closer to you": "মানবিক যত্ন, আপনার কাছাকাছি",
   "CARE, CLOSER TO YOU": "আপনার কাছেই যত্ন",
   "Find your doctor.": "আপনার ডাক্তার খুঁজুন।",

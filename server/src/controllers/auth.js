@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { clearLoginThrottle, throttleLogin } from "../middleware/rateLimit.js";
-import { toUser } from "../models/user.js";
+import { toUser, userDoctorSelect } from "../models/user.js";
 import { endSession, spendPasswordTime, startSession, verifyPassword } from "../services/auth.js";
 import { ApiError, parse } from "../utils/errors.js";
 
@@ -29,7 +29,7 @@ export const login = async (request, response) => {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    include: { doctor: { select: { id: true } } },
+    include: { doctor: { select: userDoctorSelect } },
   });
   const passwordOk = user
     ? await verifyPassword(password, user.passwordHash)

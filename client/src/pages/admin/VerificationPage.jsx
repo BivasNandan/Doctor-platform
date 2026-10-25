@@ -1,40 +1,76 @@
 import { ShieldCheck } from "lucide-react";
 import { useState } from "react";
-import ReviewActions from "../../components/admin/ReviewActions.jsx";
-import { Avatar, ErrorState, PageLoader, Pill, SectionHeading, Tabs } from "../../components/ui/index.js";
+import ApplicationReviewCard from "../../components/admin/ApplicationReviewCard.jsx";
+import { ErrorState, PageLoader, SectionHeading, Tabs } from "../../components/ui/index.js";
+import { ONBOARDING_STATUS } from "../../constants.js";
 import { useAction } from "../../hooks/useAction.js";
 import { useResource } from "../../hooks/useResource.js";
 import { adminService } from "../../services/index.js";
 
+const { INVITED, IN_PROGRESS, SUBMITTED, CHANGES_REQUESTED, REJECTED, APPROVED } = ONBOARDING_STATUS;
+
 const TABS = [
-  { key: "all", label: "All applications" },
-  { key: "pending", label: "Needs review" },
-  { key: "reviewed", label: "Reviewed" },
+  { key: "review", label: "Needs review", statuses: [SUBMITTED] },
+  { key: "progress", label: "In progress", statuses: [INVITED, IN_PROGRESS, CHANGES_REQUESTED] },
+  { key: "decided", label: "Decided", statuses: [APPROVED, REJECTED] },
+  { key: "all", label: "All doctors" },
 ];
 
-const PILL = {
-  verified: ["verified", "Reviewed"],
-  rejected: ["error", "Changes requested"],
-  suspended: ["error", "Suspended"],
-  pending: ["pending", "Needs review"],
+const DECISIONS = {
+  approve: [(doctor) => adminService.approveApplication(doctor.id), (doctor) => `${doctor.name} approved.`],
+  changes: [
+    (doctor, note) => adminService.requestApplicationChanges(doctor.id, note),
+    (doctor) => `Changes requested from ${doctor.name}.`,
+  ],
+  reject: [
+    (doctor, note) => adminService.rejectApplication(doctor.id, note),
+    (doctor) => `${doctor.name}'s application was rejected.`,
+  ],
 };
 
 export default function VerificationPage() {
   const run = useAction();
   const doctors = useResource(() => adminService.listDoctors(), []);
-  const [tab, setTab] = useState("all");
+  const [tab, setTab] = useState("review");
 
-  const decide = async (doctor, status) => {
-    const updated = await run(() => adminService.setVerification(doctor.id, status), {
-      success: () => `${doctor.name} ${status}.`,
-    });
-    if (updated) doctors.setData((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+  // Some endpoints return the plain doctor without review details: keep what we already had.
+  const merge = (updated) => {
+    if (updated)
+      doctors.setData((items) =>
+        items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+      );
+    return Boolean(updated);
   };
 
+  const check = async (doctor, input) =>
+    merge(await run(() => adminService.recordBmdcCheck(doctor.id, input), { success: "BMDC check saved." }));
+
+  const decide = async (doctor, decision, note) => {
+    const [action, message] = DECISIONS[decision];
+    return merge(await run(() => action(doctor, note), { success: () => message(doctor) }));
+  };
+
+  const resend = async (doctor) =>
+    merge(
+      await run(() => adminService.resendInvitation(doctor.id), {
+        success: `A new invitation link was sent to ${doctor.email ?? doctor.name}.`,
+      }),
+    );
+
+  // Errors are thrown on purpose: the upload form shows them.
+  const upload = async (doctor, file, kind) =>
+    merge(await adminService.uploadDoctorCertificate(doctor.id, file, kind));
+
+  const verify = async (doctor, status) =>
+    merge(
+      await run(() => adminService.setVerification(doctor.id, status), {
+        success: () => `${doctor.name} ${status}.`,
+      }),
+    );
+
+  const statuses = TABS.find((item) => item.key === tab)?.statuses;
   const list = (doctors.data ?? []).filter(
-    (doctor) =>
-      tab === "all" ||
-      (tab === "pending" ? doctor.verificationStatus === "pending" : doctor.verificationStatus !== "pending"),
+    (doctor) => !statuses || statuses.includes(doctor.application?.status ?? APPROVED),
   );
 
   return (
@@ -46,15 +82,16 @@ export default function VerificationPage() {
             Review with <em>confidence.</em>
           </>
         }
-        description="Review professional information submitted to Carewell before it’s visible to patients."
+        description="Check each doctor’s BMDC registration certificate against the BMDC register before approving them."
       />
       <div className="verification-banner">
         <span>
           <ShieldCheck size={20} />
         </span>
         <p>
-          Platform verification means professional information has been reviewed according to Carewell’s
-          process. It does not imply government certification.
+          BMDC has no automatic check: open the certificate, search the BMDC register for the same
+          registration number, and record what you found. Approval needs a matched check, and every check and
+          decision is recorded with your name.
         </p>
       </div>
       <Tabs tabs={TABS} value={tab} onChange={setTab} label="Filter applications" />
@@ -64,30 +101,17 @@ export default function VerificationPage() {
         <PageLoader />
       ) : (
         <div className="verification-list">
-          {list.map((doctor) => {
-            const [tone, label] = PILL[doctor.verificationStatus] ?? PILL.pending;
-            return (
-              <article key={doctor.id} className="verification-card surface">
-                <Avatar src={doctor.image} name={doctor.name} />
-                <div>
-                  <span className="eyebrow">PROFESSIONAL PROFILE · {doctor.id.toUpperCase()}</span>
-                  <h3>{doctor.name}</h3>
-                  <p>
-                    {doctor.specialty} · {doctor.experienceYears} years · {doctor.qualifications.join(", ")}
-                  </p>
-                  <span className="verification-doc">
-                    {doctor.certificateFiles?.length
-                      ? `${doctor.certificateFiles.length} certificate file(s) supplied`
-                      : "Certificate metadata has not been supplied by the service."}
-                  </span>
-                </div>
-                <Pill tone={tone}>{label}</Pill>
-                <div className="verification-actions">
-                  <ReviewActions doctor={doctor} onDecide={decide} />
-                </div>
-              </article>
-            );
-          })}
+          {list.map((doctor) => (
+            <ApplicationReviewCard
+              key={doctor.id}
+              doctor={doctor}
+              onCheck={check}
+              onDecide={decide}
+              onResend={resend}
+              onUpload={upload}
+              onVerification={verify}
+            />
+          ))}
           {!list.length && <p className="privacy-note">No applications in this view.</p>}
         </div>
       )}

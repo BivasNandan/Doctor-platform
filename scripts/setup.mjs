@@ -11,7 +11,7 @@
 // and are never printed. Flags: --skip-install (packages already installed), --skip-db (only write the files).
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -148,6 +148,12 @@ if (existsSync(envFile)) {
   await createEnvFile();
 }
 const env = parseEnv(readFileSync(envFile, "utf8"));
+// The administrator sign-in is not linked anywhere: give it a hard-to-guess address once, and keep it.
+if (!env.VITE_ADMIN_LOGIN_PATH) {
+  env.VITE_ADMIN_LOGIN_PATH = `/staff-${randomBytes(6).toString("hex")}`;
+  appendFileSync(envFile, `\n# Unlisted administrator sign-in page (read by the website)\nVITE_ADMIN_LOGIN_PATH=${env.VITE_ADMIN_LOGIN_PATH}\n`);
+  console.log(`${green("✔")} Added an administrator sign-in address to .env.local`);
+}
 const missing = ["DATABASE_URL", "AWS_ENDPOINT_URL_S3", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION", "SEED_ADMIN_PASSWORD"].filter((key) => !env[key]);
 if (missing.length) {
   rl.close();
@@ -200,5 +206,6 @@ ${green("✔ Setup finished.")}
 
   Start everything:   ${bold("npm run dev")}
   Then open:          ${bold("http://localhost:5173/Doctor-platform/")}
+  Admin sign-in page: ${bold(`http://localhost:5173/Doctor-platform/#${env.VITE_ADMIN_LOGIN_PATH}`)}  (not linked anywhere: VITE_ADMIN_LOGIN_PATH in .env.local)
   Sign in as admin:   ${bold(env.SEED_ADMIN_EMAIL ?? "admin@carewell.test")}  with the administrator password in .env.local (SEED_ADMIN_PASSWORD)
 `);

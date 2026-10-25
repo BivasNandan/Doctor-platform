@@ -49,3 +49,35 @@ export function timeAgo(value, now = new Date()) {
   if (seconds < 7 * 86_400) return `${Math.round(seconds / 86_400)} d ago`;
   return formatDateTime(value, now);
 }
+
+/** "25 October 2026" (in the reader's own date order) for an ISO timestamp; "" when missing. */
+export const formatDay = (value) =>
+  value
+    ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })
+    : "";
+
+const twoDigits = (value) => String(value).padStart(2, "0");
+const minutesOfClock = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+const clockOfMinutes = (minutes) => `${twoDigits(Math.floor(minutes / 60))}:${twoDigits(minutes % 60)}`;
+
+/**
+ * Cuts "09:00"–"09:30" into back-to-back slots of `minutes` (the server does the same when
+ * availability is saved). Returns [] unless the window divides evenly.
+ */
+export function splitIntoSlots(startTime, endTime, minutes) {
+  if (!startTime || !endTime) return [];
+  const start = minutesOfClock(startTime);
+  const length = minutesOfClock(endTime) - start;
+  if (length <= 0 || length % minutes !== 0) return [];
+  return Array.from({ length: length / minutes }, (_, index) => ({
+    startTime: clockOfMinutes(start + index * minutes),
+    endTime: clockOfMinutes(start + (index + 1) * minutes),
+  }));
+}
+
+/** "16:10" → "4:10 PM", the label patients see. */
+export function clockToLabel(hhmm) {
+  const minutes = minutesOfClock(hhmm);
+  const hours = Math.floor(minutes / 60);
+  return `${hours % 12 || 12}:${twoDigits(minutes % 60)} ${hours < 12 ? "AM" : "PM"}`;
+}

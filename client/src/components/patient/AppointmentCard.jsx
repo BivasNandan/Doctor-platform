@@ -1,4 +1,4 @@
-import { Clock3, MapPin, Printer, Video } from "lucide-react";
+import { ChevronDown, Clock3, MapPin, Printer, Video } from "lucide-react";
 import { useState } from "react";
 import { APPOINTMENT_STATUS_LABELS, PATIENT_CANCELLABLE_STATUSES, relationshipTag } from "../../constants.js";
 import { parseDateKey } from "../../utils/dates.js";
@@ -27,7 +27,8 @@ export default function AppointmentCard({ appointment, doctor, facility, onCance
     <article className="appointment-card surface">
       <div className="appointment-date">
         <strong>{date.toLocaleDateString("en", { day: "2-digit" })}</strong>
-        <span>{date.toLocaleDateString("en", { month: "short", weekday: "short" })}</span>
+        <span>{date.toLocaleDateString("en", { month: "short" })}</span>
+        <small>{date.toLocaleDateString("en", { weekday: "short" })}</small>
       </div>
       <Avatar className="appointment-doctor-image" src={doctor?.image} name={doctor?.name ?? "Doctor"} />
       <div className="appointment-detail">
@@ -61,15 +62,20 @@ export default function AppointmentCard({ appointment, doctor, facility, onCance
           </button>
         )}
         <details className="appointment-detail-more">
-          <summary>{t("Request details")}</summary>
-          <p>
-            Reference: {appointment.id}
-            {appointment.simulated ? " (simulated)" : ""}
-          </p>
-          <p>Status: {appointment.status}; a pending request is not a confirmed appointment.</p>
-          <p>
-            Clinic: {facility?.name || "Unavailable"} · {facility?.address || ""}
-          </p>
+          <summary className="text-link">
+            {t("Request details")} <ChevronDown size={14} aria-hidden="true" />
+          </summary>
+          {/* Opens as a small panel under the row, so the actions never shift. */}
+          <div className="appointment-detail-panel">
+            <p>
+              Reference: {appointment.id}
+              {appointment.simulated ? " (simulated)" : ""}
+            </p>
+            <p>Status: {appointment.status}; a pending request is not a confirmed appointment.</p>
+            <p>
+              Clinic: {facility?.name || "Unavailable"} · {facility?.address || ""}
+            </p>
+          </div>
         </details>
       </div>
       <section className="appointment-receipt" aria-label="Printable appointment confirmation">

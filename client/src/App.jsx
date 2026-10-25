@@ -12,6 +12,7 @@ import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { RealtimeProvider } from "./context/RealtimeContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { ToastProvider } from "./context/ToastContext.jsx";
+import DoctorInvitationPage from "./pages/auth/DoctorInvitationPage.jsx";
 import DoctorRegisterPage from "./pages/auth/DoctorRegisterPage.jsx";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
@@ -30,6 +31,7 @@ import FacilitiesPage from "./pages/public/FacilitiesPage.jsx";
 
 // Role-restricted areas are split into separate bundles: patients never download them.
 const DoctorDashboardPage = lazy(() => import("./pages/doctor/DoctorDashboardPage.jsx"));
+const DoctorApplicationPage = lazy(() => import("./pages/doctor/DoctorApplicationPage.jsx"));
 const AdminOverviewPage = lazy(() => import("./pages/admin/AdminOverviewPage.jsx"));
 const DoctorManagementPage = lazy(() => import("./pages/admin/DoctorManagementPage.jsx"));
 const VerificationPage = lazy(() => import("./pages/admin/VerificationPage.jsx"));
@@ -74,13 +76,16 @@ export default function App() {
         {/* Doctors */}
         <Route path={PATHS.doctorLogin} element={<LoginPage portal={ROLES.DOCTOR} />} />
         <Route path={PATHS.doctorRegister} element={<DoctorRegisterPage />} />
+        <Route path={PATHS.doctorInvitation} element={<DoctorInvitationPage />} />
         <Route element={<RequireRole role={ROLES.DOCTOR} />}>
+          <Route path={PATHS.doctorApplication} element={<DoctorApplicationPage />} />
           <Route path={PATHS.doctorDashboard} element={<DoctorDashboardPage />} />
         </Route>
 
-        {/* Administrators */}
-        <Route path={PATHS.adminLogin} element={<LoginPage portal={ROLES.ADMIN} />} />
-        <Route element={<RequireRole role={ROLES.ADMIN} />}>
+        {/* Administrators: sign-in lives at the unlisted VITE_ADMIN_LOGIN_PATH, and the area
+            answers "not found" to everyone else so it never points there */}
+        {PATHS.adminLogin && <Route path={PATHS.adminLogin} element={<LoginPage portal={ROLES.ADMIN} />} />}
+        <Route element={<RequireRole role={ROLES.ADMIN} fallback={<NotFoundPage />} />}>
           <Route path={PATHS.admin} element={<AdminOverviewPage />} />
           <Route path={PATHS.adminDoctors} element={<DoctorManagementPage />} />
           <Route path={PATHS.adminVerification} element={<VerificationPage />} />

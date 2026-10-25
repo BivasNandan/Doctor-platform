@@ -1,6 +1,7 @@
 import { env } from "../config/env.js";
 import { prisma } from "../config/prisma.js";
 import { readCookie, SESSION_COOKIE, sha256 } from "../services/auth.js";
+import { userDoctorSelect } from "../models/user.js";
 import { ApiError } from "../utils/errors.js";
 
 const BLOCKED = new Set(["suspended", "deactivated"]);
@@ -11,7 +12,7 @@ export async function authenticate(request, response, next) {
   if (token) {
     const session = await prisma.session.findUnique({
       where: { tokenHash: sha256(token) },
-      include: { user: { include: { doctor: { select: { id: true } } } } },
+      include: { user: { include: { doctor: { select: userDoctorSelect } } } },
     });
     const valid =
       session &&
@@ -41,6 +42,23 @@ export function requireRole(...roles) {
       return next(new ApiError(403, "FORBIDDEN", "You do not have permission to perform this action."));
     return next();
   };
+}
+
+/**
+ * Doctors reach appointments and availability only once the administration has approved their
+ * application. Before that they can complete their profile, upload certificates and message the
+ * administration. Use after requireRole("doctor").
+ */
+export function requireApprovedDoctor(request, response, next) {
+  if (request.user?.doctor?.onboardingStatus !== "approved")
+    return next(
+      new ApiError(
+        403,
+        "APPLICATION_NOT_APPROVED",
+        "This becomes available once the administration approves your application.",
+      ),
+    );
+  return next();
 }
 
 // Browsers always send an Origin header on cross-site POST/PATCH/DELETE. Requests without one

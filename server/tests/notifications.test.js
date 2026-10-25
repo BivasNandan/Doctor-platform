@@ -31,12 +31,12 @@ beforeEach(() => ctx.resetRateLimits());
 async function booked(extra = {}) {
   const doctor = await people.createDoctor(clinic);
   const patient = await people.createPatient();
-  const slot = ok(
+  const [slot] = ok(
     await doctor.client.post("/doctor/availability", {
       facilityId: clinic.id,
       date: day(2),
       startTime: "10:00",
-      endTime: "10:30",
+      endTime: "10:10",
     }),
     201,
   );
@@ -253,14 +253,23 @@ describe("doctor onboarding", () => {
     facilityIds: [clinic.id],
   });
 
-  it("tells the administrators about a registration and each certificate", async () => {
+  it("tells the administrators when an application is submitted, not at registration", async () => {
     const client = ctx.client();
     ok(await client.post("/auth/doctor/register", registration("notify.me@test.local")), 201);
-    for (const admin of admins)
-      assert.match((await find(admin, "New doctor awaiting verification")).body, /Dr\. Notify Me registered/);
+    ok(await upload(ctx, client, "/doctor/certificates", { name: "bmdc.pdf", kind: "bmdc" }), 201);
+    assert.equal(await find(admins[0], "New doctor application"), undefined);
 
-    ok(await upload(ctx, client, "/doctor/certificates", { name: "degree.pdf" }), 201);
-    ok(await upload(ctx, client, "/doctor/certificates", { name: "licence.pdf" }), 201);
+    const code = [...ctx.outbox].reverse().find((mail) => mail.to === "notify.me@test.local").subject.slice(0, 6);
+    ok(await client.post("/auth/verify-email", { code }));
+    ok(await client.post("/doctor/application/submit"));
+    for (const admin of admins)
+      assert.match((await find(admin, "New doctor application")).body, /Dr\. Notify Me submitted/);
+  });
+
+  it("tells the administrators when an approved doctor uploads a certificate", async () => {
+    const doctor = await people.createDoctor(clinic);
+    ok(await upload(ctx, doctor.client, "/doctor/certificates", { name: "degree.pdf" }), 201);
+    ok(await upload(ctx, doctor.client, "/doctor/certificates", { name: "licence.pdf" }), 201);
     const uploads = (await inbox(admins[0])).filter(
       (item) => item.title === "A doctor uploaded a certificate",
     );
@@ -295,13 +304,13 @@ describe("doctor onboarding", () => {
       }),
     );
     assert.ok(await find(doctor, "Your profile was updated"));
-    const slot = ok(
+    const [slot] = ok(
       await admins[0].client.post("/admin/availability", {
         doctorId: doctor.id,
         facilityId: clinic.id,
         date: day(3),
         startTime: "09:00",
-        endTime: "09:30",
+        endTime: "09:10",
       }),
       201,
     );

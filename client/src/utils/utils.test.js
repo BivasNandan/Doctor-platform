@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { doctorsSearchPath } from "../constants.js";
+import { adminLoginPath, doctorsSearchPath } from "../constants.js";
 import { clockLabelToMinutes, formatDateTime, localDateKey, parseDateKey, timeAgo } from "./dates.js";
 import { formatFee, initials, slugify, splitList } from "./format.js";
 import { isValidEmail, isValidPhone, validateAppointmentDetails, validateAttachment } from "./validation.js";
@@ -105,5 +105,19 @@ describe("doctorsSearchPath", () => {
       "/doctors?specialty=cardiology",
     );
     expect(doctorsSearchPath({})).toBe("/doctors");
+  });
+});
+
+describe("adminLoginPath", () => {
+  it("accepts a path, a bare name or a whole pasted link", () => {
+    expect(adminLoginPath("/staff-x7k2")).toBe("/staff-x7k2");
+    expect(adminLoginPath(" staff-x7k2/ ")).toBe("/staff-x7k2");
+    expect(adminLoginPath("http://localhost:5173/Doctor-platform/#/staff-x7k2")).toBe("/staff-x7k2");
+  });
+
+  it("turns administrator sign-in off when empty", () => {
+    expect(adminLoginPath("")).toBeNull();
+    expect(adminLoginPath(undefined)).toBeNull();
+    expect(adminLoginPath("/")).toBeNull();
   });
 });

@@ -63,6 +63,61 @@ export const ACCOUNT_STATUS = Object.freeze({
   DEACTIVATION_REQUESTED: "deactivation_requested",
 });
 
+/**
+ * Where a doctor is in joining Carewell. Appointments and availability open only when `approved`.
+ * invited → in_progress → submitted → approved (or changes_requested → submitted, or rejected).
+ */
+export const ONBOARDING_STATUS = Object.freeze({
+  INVITED: "invited",
+  IN_PROGRESS: "in_progress",
+  SUBMITTED: "submitted",
+  CHANGES_REQUESTED: "changes_requested",
+  REJECTED: "rejected",
+  APPROVED: "approved",
+});
+
+export const ONBOARDING_STATUS_LABELS = Object.freeze({
+  invited: "Invited",
+  in_progress: "In progress",
+  submitted: "Waiting for review",
+  changes_requested: "Changes requested",
+  rejected: "Not approved",
+  approved: "Approved",
+});
+
+/** The administrator's comparison of the BMDC certificate with the BMDC register. */
+export const BMDC_CHECK = Object.freeze({
+  UNCHECKED: "unchecked",
+  MATCHED: "matched",
+  NOT_FOUND: "not_found",
+  MISMATCH: "mismatch",
+});
+
+export const BMDC_CHECK_LABELS = Object.freeze({
+  unchecked: "Not checked yet",
+  matched: "Matched",
+  not_found: "Not found",
+  mismatch: "Details don’t match",
+});
+
+export const CERTIFICATE_KINDS = Object.freeze([
+  { value: "bmdc", label: "BMDC registration certificate" },
+  { value: "degree", label: "Degree certificate" },
+  { value: "other", label: "Other document" },
+]);
+
+export const certificateKindLabel = (value) =>
+  CERTIFICATE_KINDS.find((item) => item.value === value)?.label ?? "Document";
+
+/** BMDC's public register search, opened by administrators to check a certificate by hand. */
+export const BMDC_SEARCH_URL = "https://verify.bmdc.org.bd/";
+
+/** Days after a rejection before a doctor may apply again (the server enforces it). */
+export const REAPPLY_DAYS = 30;
+
+/** Length of one bookable time. A doctor's availability window is cut into back-to-back slots of this size. */
+export const SLOT_MINUTES = 10;
+
 export const SLOT_STATUS = Object.freeze({
   AVAILABLE: "available",
   BOOKED: "booked",
@@ -83,6 +138,8 @@ export const isPubliclyListed = (doctor) =>
 export function statusTone(status) {
   switch (status) {
     case "verified":
+    case "approved":
+    case "matched":
     case "accepted":
     case "available":
     case "published":
@@ -91,8 +148,15 @@ export function statusTone(status) {
     case "pending":
     case "unpublished":
     case "deactivation_requested":
+    case "invited":
+    case "in_progress":
+    case "submitted":
+    case "changes_requested":
+    case "unchecked":
       return "pending";
     case "rejected":
+    case "not_found":
+    case "mismatch":
     case "cancelled":
     case "suspended":
     case "deactivated":
@@ -165,10 +229,15 @@ export const PATHS = Object.freeze({
   profile: "/profile",
 
   doctorLogin: "/doctor/login",
+  /** "Join as a doctor": linked from the footer and the doctor sign-in page, not the navigation. */
   doctorRegister: "/doctor/register",
+  doctorApplication: "/doctor/application",
+  /** Opened from the invitation email (`?token=…`). */
+  doctorInvitation: "/doctor/invitation",
   doctorDashboard: "/doctor/dashboard",
 
-  adminLogin: "/admin/login",
+  /** Unlisted on purpose: set by VITE_ADMIN_LOGIN_PATH. Null when unset (administrator sign-in is off). */
+  adminLogin: adminLoginPath(import.meta.env.VITE_ADMIN_LOGIN_PATH),
   admin: "/admin",
   adminDoctors: "/admin/doctors",
   adminVerification: "/admin/verification",
@@ -220,3 +289,16 @@ export const config = Object.freeze({
 });
 
 export const isDemoMode = config.dataMode === "demo";
+
+/**
+ * Normalises VITE_ADMIN_LOGIN_PATH ("staff-x7k2/" → "/staff-x7k2"). A whole pasted link works too:
+ * only the route after "#" counts ("http://localhost:5173/Doctor-platform/#/staff-x7k2" → "/staff-x7k2").
+ * Hiding the address keeps the administrator sign-in out of sight; it is not a security boundary
+ * (the value ships in the bundle).
+ */
+export function adminLoginPath(value) {
+  const text = String(value ?? "").trim();
+  const route = text.includes("#") ? text.slice(text.indexOf("#") + 1) : text;
+  const path = route.replace(/^\/*/, "/").replace(/\/+$/, "");
+  return path ? path : null;
+}

@@ -1,10 +1,11 @@
-import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import App, { AppProviders } from "./App.jsx";
-import { DEMO_VERIFICATION_CODE } from "./constants.js";
+import { DEMO_VERIFICATION_CODE, PATHS } from "./constants.js";
 import { useResource } from "./hooks/useResource.js";
+import { adminService, authService } from "./services/index.js";
 
 vi.setConfig({ testTimeout: 20000 });
 
@@ -17,6 +18,13 @@ function renderApp(path = "/discover") {
       </AppProviders>
     </MemoryRouter>,
   );
+  return user;
+}
+
+/** Opens the unlisted administrator sign-in, signs in and continues to `path`. */
+async function renderAsAdmin(path) {
+  const user = renderApp({ pathname: PATHS.adminLogin, state: { from: { pathname: path } } });
+  await signIn(user, "admin@example.test");
   return user;
 }
 
@@ -278,8 +286,14 @@ describe("appointments", () => {
 });
 
 describe("administrator area", () => {
-  it("redirects guests to sign-in, then opens the dashboard and every admin page", async () => {
-    const user = renderApp("/admin");
+  it("shows guests 'not found' instead of pointing them to the administrator sign-in", async () => {
+    renderApp("/admin/doctors");
+    expect(await screen.findByText("Page not found")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Administrator sign in" })).not.toBeInTheDocument();
+  });
+
+  it("signs in at the unlisted address, then opens the dashboard and every admin page", async () => {
+    const user = renderApp(PATHS.adminLogin);
     expect(
       await screen.findByRole("heading", { level: 1, name: "Administrator sign in" }),
     ).toBeInTheDocument();
@@ -306,8 +320,7 @@ describe("administrator area", () => {
   });
 
   it("adds a facility without crashing (regression)", async () => {
-    const user = renderApp("/admin/facilities");
-    await signIn(user, "admin@example.test");
+    const user = await renderAsAdmin(PATHS.adminFacilities);
     await user.click(await screen.findByRole("button", { name: /Add facility/ }));
     await user.type(await screen.findByLabelText(/Facility name/), "Riverside Clinic");
     await user.type(screen.getByLabelText(/Street address/), "House 4, Road 2");
@@ -318,18 +331,39 @@ describe("administrator area", () => {
     expect(await screen.findByText("Riverside Clinic")).toBeInTheDocument();
   });
 
-  it("approves and publishes a pending doctor", async () => {
-    const user = renderApp("/admin/doctors");
-    await signIn(user, "admin@example.test");
+  it("checks the BMDC certificate, approves the application, then publishes", async () => {
+    const user = await renderAsAdmin(PATHS.adminVerification);
+    const card = (await screen.findByRole("heading", { name: "Dr. Mahmud Hasan" })).closest("article");
+    expect(within(card).getByText("BMDC-registration.pdf")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: /Search the BMDC register/ })).toHaveAttribute(
+      "href",
+      "https://verify.bmdc.org.bd/",
+    );
+    expect(within(card).getByRole("button", { name: /Approve/ })).toBeDisabled(); // no BMDC check yet
+
+    await user.click(within(card).getByRole("button", { name: "Save BMDC check" })); // "Matched" is preselected
+    await user.click(await within(card).findByRole("button", { name: /Approve/ }));
+    expect(await screen.findByText("Dr. Mahmud Hasan approved.")).toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByRole("navigation", { name: "Main navigation" })).getByRole("link", {
+        name: "Doctor management",
+      }),
+    );
     const row = (await screen.findByText("Dr. Mahmud Hasan")).closest("tr");
-    await user.click(within(row).getByRole("button", { name: "Approve" }));
     await user.click(await within(row).findByRole("button", { name: "Publish" }));
     expect(await screen.findByText(/Dr. Mahmud Hasan profile published/)).toBeInTheDocument();
   });
 
+  it("sends an applicant to review instead of approving from the doctor list", async () => {
+    await renderAsAdmin(PATHS.adminDoctors);
+    const row = (await screen.findByText("Dr. Mahmud Hasan")).closest("tr");
+    expect(within(row).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(within(row).getByRole("link", { name: "Review application" })).toBeInTheDocument();
+  });
+
   it("asks before deactivating a doctor", async () => {
-    const user = renderApp("/admin/doctors");
-    await signIn(user, "admin@example.test");
+    const user = await renderAsAdmin(PATHS.adminDoctors);
     const row = (await screen.findByText("Dr. Farhan Ahmed")).closest("tr");
     await user.click(within(row).getByRole("button", { name: "Deactivate" }));
     const dialog = await screen.findByRole("dialog");
@@ -362,7 +396,7 @@ describe("doctor workspace", () => {
     expect(await screen.findByText(/profile update saved/i)).toBeInTheDocument();
   });
 
-  it("creates an availability slot and rejects an overlapping one", async () => {
+  it("creates 10-minute slots from a window and rejects an overlapping one", async () => {
     const user = renderApp("/doctor/dashboard");
     await signIn(user, "dr.arif@example.test");
     await user.click(await screen.findByRole("tab", { name: "Availability" }));
@@ -383,7 +417,7 @@ describe("doctor workspace", () => {
     };
 
     await fill("11:00", "11:30");
-    expect(await screen.findByText(/Slot created/)).toBeInTheDocument();
+    expect(await screen.findByText(/Created 3 bookable times of 10 minutes/)).toBeInTheDocument();
     await fill("11:15", "11:45");
     expect(await screen.findByText("This slot overlaps existing availability.")).toBeInTheDocument();
   });
@@ -396,6 +430,74 @@ describe("doctor workspace", () => {
   });
 });
 
+describe("joining as a doctor", () => {
+  const applicant = {
+    name: "Dr. Rumana Sultana",
+    email: "rumana@example.test",
+    phone: "+8801711000000",
+    password: "doctor-pass-123",
+    specialtyId: "cardiology",
+    qualifications: ["MBBS"],
+    experienceYears: 6,
+    fee: 1200,
+    location: "Mirpur, Dhaka",
+    facilityIds: ["f1"],
+  };
+
+  it("keeps doctor registration out of the navigation and links it from the footer", async () => {
+    renderApp("/discover");
+    const nav = await screen.findByRole("navigation", { name: "Main navigation" });
+    expect(
+      within(nav).queryByRole("link", { name: /Doctor registration|Join as a doctor/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("contentinfo")).toHaveTextContent("Join as a doctor");
+  });
+
+  it("walks an applicant through email, BMDC certificate and submission", async () => {
+    await authService.registerDoctor(applicant);
+    const user = renderApp(PATHS.doctorDashboard); // not approved yet: the workspace sends them to the application
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Your doctor application" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Submit application/ })).toBeDisabled();
+
+    await user.type(screen.getByLabelText(/Verification code/), DEMO_VERIFICATION_CODE);
+    await user.click(screen.getByRole("button", { name: "Confirm email" }));
+    await user.upload(
+      await screen.findByLabelText(/^File/),
+      new File(["%PDF-1.4"], "bmdc-certificate.pdf", { type: "application/pdf" }),
+    );
+    await user.click(screen.getByRole("button", { name: /Upload/ }));
+    expect(await screen.findByText("bmdc-certificate.pdf")).toBeInTheDocument();
+
+    await user.click(await screen.findByRole("button", { name: /Submit application/ }));
+    expect(await screen.findByText(/Submitted on/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Upload/ })).not.toBeInTheDocument(); // locked during review
+  });
+
+  it("lets an invited doctor set a password from the link", async () => {
+    await authService.login({ email: "admin@example.test", password: "x", portal: "admin" });
+    const invited = await adminService.addDoctor({ ...applicant, email: "senior@example.test" });
+    await authService.logout();
+
+    const user = renderApp(`${PATHS.doctorInvitation}?token=${invited.simulatedInvitationToken}`);
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /Welcome, Dr. Rumana Sultana/ }),
+    ).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/^Password/), "senior-pass-1");
+    await user.type(screen.getByLabelText(/Confirm password/), "senior-pass-1");
+    await user.click(screen.getByRole("button", { name: /Set password and continue/ }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Your doctor application" }),
+    ).toBeInTheDocument();
+  });
+
+  it("explains an expired invitation link", async () => {
+    renderApp(`${PATHS.doctorInvitation}?token=not-a-real-token`);
+    expect(await screen.findByText("This invitation link has expired")).toBeInTheDocument();
+  });
+});
+
 describe("shell", () => {
   it("toggles the theme and remembers it", async () => {
     const user = renderApp("/discover");
@@ -405,13 +507,19 @@ describe("shell", () => {
     expect(localStorage.getItem("carewell-theme")).toBe("light");
   });
 
+  it("keeps the administrator sign-in out of the navigation", async () => {
+    renderApp("/discover");
+    const nav = await screen.findByRole("navigation", { name: "Main navigation" });
+    expect(within(nav).queryByRole("link", { name: "Administrator sign in" })).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Doctor sign in" })).toBeInTheDocument();
+  });
+
   it("only shows admin navigation to administrators", async () => {
-    const user = renderApp("/discover");
+    renderApp("/discover");
     const nav = await screen.findByRole("navigation", { name: "Main navigation" });
     expect(within(nav).queryByRole("link", { name: "Doctor management" })).not.toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "Administrator sign in" })).toBeInTheDocument();
-    await user.click(within(nav).getByRole("link", { name: "Administrator sign in" }));
-    await signIn(user, "admin@example.test");
+    cleanup();
+    await renderAsAdmin(PATHS.admin);
     await waitFor(() =>
       expect(
         within(screen.getByRole("navigation", { name: "Main navigation" })).getByRole("link", {

@@ -4,13 +4,14 @@ import { appointmentInclude, toAppointment } from "../models/appointment.js";
 import { doctorInclude, findDoctor } from "../models/doctor.js";
 import { changeAppointmentStatus, DOCTOR_TRANSITIONS } from "../services/appointments.js";
 import {
-  createSlot,
+  createSlots,
   createSlotSchema,
   listSlots,
   removeSlot,
   updateSlot,
   updateSlotSchema,
 } from "../services/availability.js";
+import { assertApplicationOpen } from "../services/applications.js";
 import { profileSchema, saveDoctorProfile } from "../services/doctorProfile.js";
 import { LINKS, notifyAdmins } from "../services/notifications.js";
 import { ApiError, notFound, parse, uuid } from "../utils/errors.js";
@@ -54,9 +55,11 @@ export const updateProfile = async (request, response) => {
   const id = ownDoctorId(request);
   const data = parse(profileSchema, request.body);
   const doctor = await prisma.doctor.findUnique({ where: { id }, include: doctorInclude });
+  assertApplicationOpen(doctor);
 
   const changed = await saveDoctorProfile(doctor, data);
-  const reviewRequired = changed.length > 0;
+  // Before approval the whole profile is reviewed with the application anyway.
+  const reviewRequired = changed.length > 0 && doctor.onboardingStatus === "approved";
   if (reviewRequired) {
     await prisma.doctor.update({ where: { id }, data: { profileReviewRequired: true } });
     const names = { specialtyId: "specialty", qualifications: "qualifications", facilityIds: "clinics" };
@@ -101,7 +104,8 @@ export const listAvailability = async (request, response) => {
 
 export const createAvailability = async (request, response) => {
   assertCanChange(request);
-  response.status(201).json(await createSlot(ownDoctorId(request), parse(createSlotSchema, request.body)));
+  // One window becomes back-to-back 10-minute slots; all of them are returned.
+  response.status(201).json(await createSlots(ownDoctorId(request), parse(createSlotSchema, request.body)));
 };
 
 export const updateAvailability = async (request, response) => {

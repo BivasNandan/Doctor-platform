@@ -42,6 +42,13 @@ export function AuthProvider({ children }) {
     return result;
   }, []);
 
+  /** Sets an invited doctor's password from the emailed link and signs them in. */
+  const acceptInvitation = useCallback(async (input) => {
+    const result = await authService.acceptInvitation(input);
+    setUser(result.user);
+    return result.user;
+  }, []);
+
   const registerPatient = useCallback(async (input) => {
     const result = await authService.registerPatient(input);
     setUser(result.user);
@@ -82,6 +89,7 @@ export function AuthProvider({ children }) {
       isLoading: status === "loading",
       login,
       registerDoctor,
+      acceptInvitation,
       registerPatient,
       verifyEmail,
       resendVerification: authService.resendVerification,
@@ -89,7 +97,18 @@ export function AuthProvider({ children }) {
       changePhoto,
       logout,
     }),
-    [user, status, login, registerDoctor, registerPatient, verifyEmail, updateProfile, changePhoto, logout],
+    [
+      user,
+      status,
+      login,
+      registerDoctor,
+      acceptInvitation,
+      registerPatient,
+      verifyEmail,
+      updateProfile,
+      changePhoto,
+      logout,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
