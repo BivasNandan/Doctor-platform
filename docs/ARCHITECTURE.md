@@ -16,9 +16,10 @@ types.js                 JSDoc typedefs for every API shape (no runtime code)
 
 pages/                   one file per screen, grouped by who uses it
   public/                  DiscoverPage, DirectoryPage, DoctorProfilePage, FacilitiesPage, AssistancePage
-  auth/                    LoginPage, SignUpPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, DoctorRegisterPage
+  auth/                    LoginPage, SignUpPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, DoctorRegisterPage,
+                           DoctorInvitationPage
   patient/                 AppointmentsPage, ProfilePage
-  doctor/                  DoctorDashboardPage
+  doctor/                  DoctorApplicationPage (until approved), DoctorDashboardPage
   admin/                   AdminOverviewPage, DoctorManagementPage, VerificationPage, FacilityManagementPage,
                            AppointmentManagementPage, SpecialtiesPage, AdminAvailabilityPage,
                            SupportRequestsPage, DeactivationRequestsPage

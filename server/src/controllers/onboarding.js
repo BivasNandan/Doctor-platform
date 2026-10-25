@@ -2,9 +2,17 @@ import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { findDoctor } from "../models/doctor.js";
-import { toUser } from "../models/user.js";
+import { toUser, userDoctorSelect } from "../models/user.js";
+import {
+  assertApplicationOpen,
+  certificateKind,
+  resetBmdcCheck,
+  storeCertificate,
+  toCertificate,
+} from "../services/applications.js";
 import { hashPassword, startSession } from "../services/auth.js";
-import { discardUpload, saveUpload } from "../services/files.js";
+import { issueVerificationCode } from "../services/emailCodes.js";
+import { discardUpload } from "../services/files.js";
 import { LINKS, notifyAdmins } from "../services/notifications.js";
 import { ApiError, conflict, notFound, parse, uuid } from "../utils/errors.js";
 
@@ -14,7 +22,6 @@ import { ApiError, conflict, notFound, parse, uuid } from "../utils/errors.js";
  */
 
 const HOUR = 60 * 60 * 1000;
-const MAX_CERTIFICATES = 5;
 
 // ── POST /auth/doctor/register ────────────────────────────────────────────────────────────
 // The profile fields mirror doctorProfile.js (administrator and doctor editing). They are
@@ -39,8 +46,10 @@ const registerSchema = z.object({
 });
 
 /**
- * Creates the account and a profile that is `pending` and `unpublished` until an administrator
- * verifies it, signs the doctor in, and returns `{ user, doctor }`. The role is fixed to doctor.
+ * Step 1 of a self-application: creates the account and a profile that is `pending`,
+ * `unpublished` and `in_progress`, signs the doctor in, emails a 6-digit code to confirm the
+ * address, and returns `{ user, doctor }`. The role is fixed to doctor. The administrators hear
+ * about it only when the doctor submits the application (see controllers/applications.js).
  */
 export const registerDoctor = async (request, response) => {
   rateLimit(
@@ -80,16 +89,11 @@ export const registerDoctor = async (request, response) => {
         },
       },
     },
-    include: { doctor: { select: { id: true } } },
+    include: { doctor: { select: userDoctorSelect } },
   });
   await prisma.conversation.create({ data: { kind: "doctor_admin", doctorId: user.doctor.id } });
   await startSession(request, response, user.id);
-  await notifyAdmins({
-    kind: "doctor",
-    title: "New doctor awaiting verification",
-    body: `${data.name} registered and is waiting for review.`,
-    link: LINKS.adminVerification,
-  });
+  await issueVerificationCode(user);
   response.status(201).json({ user: toUser(user), doctor: await findDoctor(user.doctor.id) });
 };
 
@@ -98,11 +102,13 @@ const ownDoctorId = (request) => {
   if (!id) throw notFound("Your doctor profile");
   return id;
 };
-const toCertificate = (row) => ({
-  id: row.id,
-  fileName: row.fileName,
-  uploadedAt: row.uploadedAt.toISOString(),
-});
+
+/** The signed-in doctor's profile row (status and id). */
+const ownDoctor = async (request) => {
+  const doctor = await prisma.doctor.findUnique({ where: { id: ownDoctorId(request) } });
+  if (!doctor) throw notFound("Your doctor profile");
+  return doctor;
+};
 
 export const listCertificates = async (request, response) => {
   const rows = await prisma.doctorCertificate.findMany({
@@ -112,41 +118,36 @@ export const listCertificates = async (request, response) => {
   response.json(rows.map(toCertificate));
 };
 
-/** POST /doctor/certificates (multipart field `file`): a PDF or image, up to 10 MB, at most 5 files. */
+/**
+ * POST /doctor/certificates (multipart: field `kind` = bmdc | degree | other, then `file`): a PDF or
+ * image, up to 10 MB, at most 5 files. A BMDC registration certificate is needed to submit an application.
+ */
 export const uploadCertificate = async (request, response) => {
-  const doctorId = ownDoctorId(request);
+  const doctor = await ownDoctor(request);
   rateLimit(`certificate:${request.user.id}`, 20, HOUR);
-  if ((await prisma.doctorCertificate.count({ where: { doctorId } })) >= MAX_CERTIFICATES)
-    throw conflict(
-      "TOO_MANY_FILES",
-      `You can upload at most ${MAX_CERTIFICATES} certificate files. Remove one first.`,
-    );
-
-  const stored = await saveUpload(`certificates/${doctorId}`, request.file);
-  try {
-    const row = await prisma.doctorCertificate.create({
-      data: { doctorId, storageKey: stored.storageKey, fileName: stored.fileName },
-    });
+  assertApplicationOpen(doctor);
+  const row = await storeCertificate(doctor, request.file, certificateKind(request.body?.kind));
+  // Applicants are announced once, when they submit; approved doctors' new files need a look.
+  if (doctor.onboardingStatus === "approved")
     await notifyAdmins({
       kind: "doctor",
       title: "A doctor uploaded a certificate",
       body: `${request.user.name} uploaded "${row.fileName}" for review.`,
       link: LINKS.adminVerification,
-      groupKey: `certificate:${doctorId}`,
+      groupKey: `certificate:${doctor.id}`,
     });
-    response.status(201).json(toCertificate(row));
-  } catch (error) {
-    await discardUpload(stored.storageKey); // never leave a file nobody can find
-    throw error;
-  }
+  response.status(201).json(toCertificate(row));
 };
 
 export const deleteCertificate = async (request, response) => {
   const id = uuid(request.params.id, "This certificate");
-  const row = await prisma.doctorCertificate.findFirst({ where: { id, doctorId: ownDoctorId(request) } });
+  const doctor = await ownDoctor(request);
+  const row = await prisma.doctorCertificate.findFirst({ where: { id, doctorId: doctor.id } });
   if (!row) throw notFound("This certificate");
+  assertApplicationOpen(doctor);
   await prisma.doctorCertificate.delete({ where: { id } });
   await discardUpload(row.storageKey);
+  if (row.kind === "bmdc" && doctor.onboardingStatus !== "approved") await resetBmdcCheck(doctor.id);
   response.status(204).end();
 };
 

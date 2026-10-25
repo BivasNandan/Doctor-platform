@@ -375,6 +375,7 @@ async function main() {
               location,
               image: doctorImage(local),
               verificationStatus: "verified",
+              onboardingStatus: "approved",
               publicationStatus: "published",
               clinics: { create: clinicNames.map((n) => ({ clinicId: clinics.get(n).id })) },
             },

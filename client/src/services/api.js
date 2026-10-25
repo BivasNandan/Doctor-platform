@@ -13,8 +13,17 @@ export const authService = {
 
   logout: () => http.post("/auth/logout"),
 
-  /** Registers a doctor (pending verification) and signs them in. */
+  /**
+   * Step 1 of a doctor's application: creates the account, signs them in and emails a 6-digit
+   * code. Resolves `{ user, doctor }`; the application continues on the application page.
+   */
   registerDoctor: (input) => http.post("/auth/doctor/register", input),
+
+  /** Who an invitation link is for: `{ name, email, expiresAt }` (410 when used up or expired). */
+  getInvitation: (token) => http.get("/auth/doctor/invitation", { query: { token } }),
+
+  /** Sets the invited doctor's password and signs them in. Resolves `{ user }`. */
+  acceptInvitation: ({ token, password }) => http.post("/auth/doctor/invitation/accept", { token, password }),
 
   /** Creates a patient account and signs them in (email not yet verified). */
   registerPatient: (input) => http.post("/auth/patient/register", input),
@@ -124,7 +133,24 @@ export const doctorPortalService = {
   listAppointments: () => http.get("/doctor/appointments"),
   updateAppointmentStatus: (id, status) => http.patch(`/doctor/appointments/${segment(id)}`, { status }),
   requestDeactivation: (reason) => http.post("/doctor/account/deactivation-requests", { reason }),
+
+  /** The doctor's application: status, what is missing, the administration's note, certificates. */
+  getApplication: () => http.get("/doctor/application"),
+  submitApplication: () => http.post("/doctor/application/submit"),
+  /** A rejected doctor starts again (30 days after the decision). */
+  reopenApplication: () => http.post("/doctor/application/reopen"),
+  /** Uploads a PDF or image; `kind` is "bmdc", "degree" or "other". Resolves the certificate. */
+  uploadCertificate: (file, kind) => http.post("/doctor/certificates", certificateForm(file, kind)),
+  deleteCertificate: (id) => http.delete(`/doctor/certificates/${segment(id)}`),
 };
+
+/** Multipart body for a certificate: the `kind` field comes before the file. */
+function certificateForm(file, kind) {
+  const form = new FormData();
+  form.append("kind", kind);
+  form.append("file", file);
+  return form;
+}
 
 // ─── availability ──────────────────────────────────────────────────────────────────────────
 
@@ -139,6 +165,7 @@ export const availabilityService = {
     http.get(`${scope(admin)}/availability`, {
       query: admin ? { doctorId } : undefined,
     }),
+  /** Adds a window (e.g. 09:00–10:00); the server cuts it into 10-minute slots and resolves them all. */
   save: (doctorId, slot, { admin = false } = {}) =>
     http.post(`${scope(admin)}/availability`, admin ? { ...slot, doctorId } : slot),
   update: (id, input, { admin = false } = {}) =>
@@ -182,7 +209,19 @@ export const adminService = {
 
   // Doctors
   listDoctors: () => http.get("/admin/doctors"),
+  /** Invites a doctor: creates the account and emails a 48-hour link to set a password. */
   addDoctor: (input) => http.post("/admin/doctors", input),
+  resendInvitation: (id) => http.post(`/admin/doctors/${segment(id)}/invitation`),
+  /** `result`: "matched" | "not_found" | "mismatch" (a note is required unless matched). */
+  recordBmdcCheck: (id, { result, note }) =>
+    http.patch(`/admin/doctors/${segment(id)}/bmdc-check`, { result, note }),
+  approveApplication: (id) => http.post(`/admin/doctors/${segment(id)}/application/approve`),
+  requestApplicationChanges: (id, note) =>
+    http.post(`/admin/doctors/${segment(id)}/application/request-changes`, { note }),
+  rejectApplication: (id, note) => http.post(`/admin/doctors/${segment(id)}/application/reject`, { note }),
+  /** Adds a certificate on the doctor's behalf (e.g. a BMDC certificate handed over in person). */
+  uploadDoctorCertificate: (id, file, kind) =>
+    http.post(`/admin/doctors/${segment(id)}/certificates`, certificateForm(file, kind)),
   updateDoctor: (id, input) => http.patch(`/admin/doctors/${segment(id)}`, input),
   deactivateDoctor: (id) => http.post(`/admin/doctors/${segment(id)}/deactivation`),
   setVerification: (id, status) => http.patch(`/admin/doctors/${segment(id)}/verification`, { status }),

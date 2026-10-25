@@ -53,21 +53,57 @@ export async function listSlots(doctorId) {
   return slots.map(toSlot);
 }
 
-export async function createSlot(doctorId, data) {
+/** Length of one bookable slot. A doctor's window is cut into back-to-back slots of this size. */
+export const SLOT_MINUTES = 10;
+
+const clockOf = (minutes) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+/**
+ * Cuts a window into back-to-back slots: 09:00–09:30 → 09:00–09:10, 09:10–09:20, 09:20–09:30.
+ * The first slot starts at the start time and the last ends at the end time, so the window must
+ * divide evenly into SLOT_MINUTES.
+ */
+export function splitWindow(startTime, endTime) {
+  const start = minutesOf(startTime);
+  const length = minutesOf(endTime) - start;
+  if (length % SLOT_MINUTES !== 0)
+    throw new ApiError(
+      422,
+      "VALIDATION_FAILED",
+      `The time between start and end must divide into ${SLOT_MINUTES}-minute slots.`,
+      { endTime: `Choose an end time a multiple of ${SLOT_MINUTES} minutes after the start.` },
+    );
+  return Array.from({ length: length / SLOT_MINUTES }, (_, index) => ({
+    startTime: clockOf(start + index * SLOT_MINUTES),
+    endTime: clockOf(start + (index + 1) * SLOT_MINUTES),
+  }));
+}
+
+/**
+ * Adds a window of availability as SLOT_MINUTES slots and resolves them, earliest first. All or
+ * nothing: if any slot would overlap existing availability, none is created (409 SLOT_OVERLAP).
+ */
+export async function createSlots(doctorId, data) {
   assertValidSlot(data);
+  const pieces = splitWindow(data.startTime, data.endTime);
   await assertDoctorAtClinic(doctorId, data.facilityId);
-  const slot = await prisma.availabilitySlot.create({
-    data: {
-      doctorId,
-      clinicId: data.facilityId,
-      date: toDbDate(data.date),
-      startTime: toDbTime(data.startTime),
-      endTime: toDbTime(data.endTime),
+
+  const where = { doctorId, clinicId: data.facilityId, date: toDbDate(data.date) };
+  await prisma.availabilitySlot.createMany({
+    data: pieces.map((piece) => ({
+      ...where,
+      startTime: toDbTime(piece.startTime),
+      endTime: toDbTime(piece.endTime),
       status: data.status,
-    },
-    include: slotInclude,
+    })),
   });
-  return toSlot(slot);
+  const slots = await prisma.availabilitySlot.findMany({
+    where: { ...where, startTime: { in: pieces.map((piece) => toDbTime(piece.startTime)) } },
+    include: slotInclude,
+    orderBy: { startTime: "asc" },
+  });
+  return slots.map(toSlot);
 }
 
 /** The slot, or 404. When `doctorId` is given, another doctor's slot also answers 404. */

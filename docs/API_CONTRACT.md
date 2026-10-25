@@ -56,21 +56,23 @@ Legend: 🌐 public · 👤 any signed-in user · 🩺 doctor · 🛡️ admin.
 | 🌐 | `POST /auth/login` | `{ email, password, portal: "doctor"\|"admin" }` | `200 { user }` | `portal` is only the sign-in page used. Decide the role from the account and reject a mismatch (the client also checks `user.role`). Never reveal whether the email exists. Rate-limit. |
 | 👤 | `POST /auth/logout` | – | `204` | Destroy the session server-side. |
 | 🌐 | `GET /auth/me` | – | `200 { user }` or `401` | Called on every page load to restore the session. |
-| 🌐 | `POST /auth/doctor/register` | `{ email, password, phone, name, specialtyId, qualifications[], experienceYears, fee, location, facilityIds[] }` | `201 { user, doctor }` | Creates the account and a profile with `verificationStatus: "pending"`, `publicationStatus: "unpublished"`, and signs the doctor in. |
+| 🌐 | `POST /auth/doctor/register` | `{ email, password, phone, name, specialtyId, qualifications[], experienceYears, fee, location, facilityIds[] }` | `201 { user, doctor }` | Step 1 of a doctor application. Creates the account and a profile with `verificationStatus: "pending"`, `publicationStatus: "unpublished"`, `onboardingStatus: "in_progress"`, signs the doctor in and emails a 6-digit code (confirm with `POST /auth/verify-email`). Administrators are told only when the doctor submits. |
+| 🌐 | `GET /auth/doctor/invitation?token=…` | – | `200 { name, email, expiresAt }` or `410 INVITATION_INVALID` | The page an administrator's invitation email opens (`<site>/#/doctor/invitation?token=…`). Links last 48 hours, work once, and stop working when a newer one is sent. |
+| 🌐 | `POST /auth/doctor/invitation/accept` | `{ token, password }` | `200 { user }` or `410 INVITATION_INVALID` | Sets the password, confirms the email, moves the application to `in_progress` and signs the doctor in. |
 
 Patient accounts and password handling (all built and covered by `server/tests/accounts.test.js`):
 
 | | Endpoint | Request | Success | Notes |
 | --- | --- | --- | --- | --- |
 | 🌐 | `POST /auth/patient/register` | `{ name, email, phone, password }` | `201 { user }` (`emailVerified: false`) | Creates a patient, signs them in and emails a 6-digit code. `409 EMAIL_TAKEN`. The role is never taken from the request. |
-| 👤 | `POST /auth/verify-email` | `{ code }` | `200 { user }` | Codes last 15 min and allow 5 wrong tries (`422 INVALID_CODE`, then `429 TOO_MANY_ATTEMPTS`). Late codes get `410 CODE_EXPIRED`. |
+| 👤 | `POST /auth/verify-email` | `{ code }` | `200 { user }` | Patients and doctors (applications). Codes last 15 min and allow 5 wrong tries (`422 INVALID_CODE`, then `429 TOO_MANY_ATTEMPTS`). Late codes get `410 CODE_EXPIRED`. |
 | 👤 | `POST /auth/verify-email/resend` | – | `200 { sent }` | Replaces the old code. `429 RATE_LIMITED` within 30 s of the last one. |
 | 🌐 | `POST /auth/forgot-password` | `{ email }` | `200 { sent: true }` | Same answer whether or not the account exists. The emailed link is `<site>/#/reset-password?token=…`, valid 60 min, single use. |
-| 🌐 | `POST /auth/reset-password` | `{ token, password }` | `200 { reset: true }` or `410 RESET_TOKEN_INVALID` | Signs the account out everywhere. Also how an administrator-created doctor sets a first password. |
+| 🌐 | `POST /auth/reset-password` | `{ token, password }` | `200 { reset: true }` or `410 RESET_TOKEN_INVALID` | Signs the account out everywhere. An invited doctor may also set a first password this way. |
 | 👤 | `PATCH /auth/me` | `{ name, phone? }` | `200 { user }` | Email and role cannot be changed here. |
 | 👤 | `POST /auth/change-password` | `{ currentPassword, newPassword }` | `200 { changed: true }` | Other devices are signed out; the current one stays signed in. |
 
-`user` = `{ id, role: "doctor"\|"admin"\|"patient", name?, email?, doctorId?, accountStatus?, photoUrl? }` (`photoUrl` is set once the person has uploaded a profile photo).
+`user` = `{ id, role: "doctor"\|"admin"\|"patient", name?, email?, doctorId?, onboardingStatus?, accountStatus?, emailVerified, photoUrl? }` (`photoUrl` is set once the person has uploaded a profile photo).
 Blocked accounts (`deactivated`, `suspended`) must get `403 ACCOUNT_RESTRICTED` at login.
 
 ### Public discovery
@@ -217,15 +219,23 @@ The browser opens one stream after signing in (`EventSource` with cookies). The 
 | `GET /doctor/appointments` | – | `200 AppointmentRequest[]` (own only) |
 | `PATCH /doctor/appointments/:id` | `{ status: "accepted"\|"rejected" }` | `200 AppointmentRequest` or `409` (only `pending` can change) |
 | `GET /doctor/availability` | – | `200 AvailabilitySlot[]` |
-| `POST /doctor/availability` | `{ facilityId, date, startTime, endTime, status? }` | `201 AvailabilitySlot` |
+| `POST /doctor/availability` | `{ facilityId, date, startTime, endTime, status? }` | `201 AvailabilitySlot[]`: the window cut into back-to-back 10-minute slots |
 | `PATCH /doctor/availability/:id` | partial slot (e.g. `{ status: "unavailable" }`) | `200 AvailabilitySlot` |
 | `DELETE /doctor/availability/:id` | – | `204` |
 | `POST /doctor/account/deactivation-requests` | `{ reason }` | `201 { status: "deactivation_requested" }` |
+| `GET /doctor/application` | – | `200 Application` |
+| `POST /doctor/application/submit` | – | `200 Application`; `409 EMAIL_NOT_VERIFIED`, `422 BMDC_CERTIFICATE_REQUIRED`, `409 INVALID_TRANSITION` |
+| `POST /doctor/application/reopen` | – | `200 Application`; `409 REAPPLY_TOO_SOON` within 30 days of a rejection |
+| `GET /doctor/certificates` | – | `200 Certificate[]` |
+| `POST /doctor/certificates` | multipart: `kind` (`bmdc`, `degree` or `other`), then `file` (PDF/JPEG/PNG/WebP, ≤ 10 MB, at most 5) | `201 Certificate` |
+| `DELETE /doctor/certificates/:id` | – | `204` |
 
 - Ownership comes from the session, **never** from an id in the URL or body.
 - `reviewRequired: true` when `specialtyId`, `qualifications` or `facilityIds` changed (profile returns to admin review).
-- Availability: reject past dates, `startTime ≥ endTime`, clinics the doctor is not linked to, and overlaps with non-`unavailable` slots (`409 SLOT_OVERLAP`).
+- Availability: a window becomes back-to-back **10-minute slots** from `startTime` to `endTime` (09:00–10:00 → 09:00, 09:10, … 09:50); the window must divide evenly (`422 VALIDATION_FAILED` otherwise). All or nothing: if any slot overlaps existing availability, none is created (`409 SLOT_OVERLAP`). Also reject past dates, `startTime ≥ endTime` and clinics the doctor is not linked to. `PATCH` changes one slot. Patients see each slot as a time in `GET /doctors/:id/slots`; one with an accepted request is `booked` and cannot be requested again (`409 APPOINTMENT_CONFLICT`).
 - A `suspended`/`deactivated` account gets `403 ACCOUNT_RESTRICTED` on every mutation.
+- **Applications.** Until `onboardingStatus` is `approved`, appointments and availability answer `403 APPLICATION_NOT_APPROVED`; the profile, certificates, application and messages to the administration stay open. While `submitted` (and after `rejected`) the profile and certificates are frozen: `409 APPLICATION_LOCKED`. Before approval, profile edits do not set `reviewRequired`.
+- `Application` = `{ status, emailVerified, hasBmdcCertificate, canSubmit, submittedAt?, decidedAt?, note?, reapplyAt?, certificates: Certificate[] }`. `note` is the administration's message (changes requested or rejection reason). `Certificate` = `{ id, fileName, kind, uploadedAt }`.
 
 ### Administration (🛡️)
 
@@ -233,7 +243,13 @@ The browser opens one stream after signing in (`EventSource` with cookies). The 
 | --- | --- | --- |
 | `GET /admin/summary` | – | `200 AdminSummary` |
 | `GET /admin/doctors` | – | `200 Doctor[]` (all statuses) |
-| `POST /admin/doctors` | doctor profile fields plus the doctor's login `email` (no password: the doctor sets one through password reset) | `201 Doctor` (pending, unpublished), `409 EMAIL_TAKEN` |
+| `POST /admin/doctors` | doctor profile fields plus the doctor's `email` | `201 Doctor` (`onboardingStatus: invited`, pending, unpublished), `409 EMAIL_TAKEN`. Emails a 48-hour invitation link. |
+| `POST /admin/doctors/:id/invitation` | – | `200 Doctor`: a fresh link; older links stop working. `409` once the doctor has set up their account |
+| `POST /admin/doctors/:id/certificates` | multipart `kind` + `file` | `201 Doctor`: a certificate handed over in person |
+| `PATCH /admin/doctors/:id/bmdc-check` | `{ result, note? }`: `result` is `matched`, `not_found` or `mismatch` (note required unless matched) | `200 Doctor`; `422 BMDC_CERTIFICATE_REQUIRED` |
+| `POST /admin/doctors/:id/application/approve` | – | `200 Doctor` (`approved`, `verified`); `409 BMDC_NOT_MATCHED` without a matched check |
+| `POST /admin/doctors/:id/application/request-changes` | `{ note }` | `200 Doctor` (`changes_requested`) |
+| `POST /admin/doctors/:id/application/reject` | `{ note }` | `200 Doctor` (`rejected`; the doctor may reapply after 30 days) |
 | `PATCH /admin/doctors/:id` | doctor profile fields | `200 Doctor` |
 | `POST /admin/doctors/:id/deactivation` | – | `200 Doctor` (`accountStatus: deactivated`, `publicationStatus: inactive`) |
 | `PATCH /admin/doctors/:id/verification` | `{ status: "pending"\|"verified"\|"rejected"\|"suspended" }` | `200 Doctor` |
@@ -250,15 +266,17 @@ The browser opens one stream after signing in (`EventSource` with cookies). The 
 | `GET /admin/appointments` | – | `200 AppointmentRequest[]` (all) |
 | `PATCH /admin/appointments/:id` | `{ status }` | `200 AppointmentRequest` or `409 INVALID_TRANSITION` |
 | `GET /admin/availability` | `doctorId` | `200 AvailabilitySlot[]` |
-| `POST /admin/availability` | slot fields + `doctorId` | `201 AvailabilitySlot` |
+| `POST /admin/availability` | slot fields + `doctorId` | `201 AvailabilitySlot[]` (10-minute slots, as for doctors) |
 | `PATCH /admin/availability/:id` | partial slot | `200 AvailabilitySlot` |
 | `DELETE /admin/availability/:id` | – | `204` |
 
+- `PATCH /admin/doctors/:id/verification` with `verified` needs an approved application (`409 APPLICATION_NOT_APPROVED`): new doctors are verified only by approving their application.
 - Unverifying (`rejected`/`suspended`/`pending`) a published doctor must also set `publicationStatus` to `unpublished`.
 - Admin appointment transitions: `pending → accepted \| rejected \| cancelled`, `accepted → cancelled \| completed`.
 - `AdminPatient` = `{ id, name, email, phone?, accountStatus, emailVerified, photoUrl?, appointmentCount, createdAt, lastSeenAt? }`. Suspending a patient signs them out on every device and blocks sign-in (`403 ACCOUNT_RESTRICTED`) until restored; their appointments, messages and reviews are kept. Logged as `patient.suspend` / `patient.restore`.
 - Write an **audit log** row for every admin decision (who, what, when, before/after).
-- `AdminSummary`: `{ pendingDoctors, verifiedDoctors, appointmentsToday, activeFacilities, activeSpecialties, monthlyAppointments: [{ month: "YYYY-MM", count }] }` (12 months, oldest first).
+- **BMDC check.** BMDC offers no API, so an administrator opens the doctor's BMDC certificate, searches the BMDC register (https://verify.bmdc.org.bd/) and records the result. The check (who, when, private note) is reset whenever a BMDC certificate is added or removed before approval. `GET /admin/doctors` adds `certificateFiles[]` (with `kind` and a download `url`) and `application` = `{ status, emailVerified, submittedAt?, decidedAt?, note?, reapplyAt?, bmdcCheck: { result, note?, checkedAt?, checkedBy? }, invitationExpiresAt? }`. Each decision emails the doctor and adds a bell notification.
+- `AdminSummary` (`pendingDoctors` counts submitted applications): `{ pendingDoctors, verifiedDoctors, appointmentsToday, activeFacilities, activeSpecialties, monthlyAppointments: [{ month: "YYYY-MM", count }] }` (12 months, oldest first).
 
 ## Status vocabularies
 
@@ -269,5 +287,8 @@ Stored and returned exactly as written (see [`client/src/constants.js`](../clien
 | `AppointmentRequest.status` | `pending`, `accepted`, `rejected`, `cancelled`, `completed` |
 | `Doctor.verificationStatus` | `pending`, `verified`, `rejected`, `suspended` |
 | `Doctor.publicationStatus` | `published`, `unpublished`, `inactive` |
+| `Doctor.onboardingStatus` | `invited`, `in_progress`, `submitted`, `changes_requested`, `rejected`, `approved` |
+| `Certificate.kind` | `bmdc`, `degree`, `other` |
+| `bmdcCheck.result` | `unchecked`, `matched`, `not_found`, `mismatch` |
 | `Doctor.accountStatus` | `active`, `suspended`, `deactivated`, `deactivation_requested` |
 | `AvailabilitySlot.status` | `available`, `booked`, `unavailable` |

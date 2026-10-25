@@ -1,9 +1,17 @@
+import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
+const projectRoot = fileURLToPath(new URL("..", import.meta.url));
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+
+  // The administrator sign-in address lives in the project-root .env.local, beside the server's
+  // settings. Only this one key is read from there: the secrets in that file never reach the bundle.
+  const rootEnv = loadEnv(mode, projectRoot, "VITE_ADMIN_LOGIN_PATH");
+  if (rootEnv.VITE_ADMIN_LOGIN_PATH) process.env.VITE_ADMIN_LOGIN_PATH = rootEnv.VITE_ADMIN_LOGIN_PATH;
 
   return {
     plugins: [react()],
@@ -33,7 +41,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       // Tests always run against the in-memory demo backend, whatever .env.local says.
-      env: { VITE_CAREWELL_DATA_MODE: "demo" },
+      env: { VITE_CAREWELL_DATA_MODE: "demo", VITE_ADMIN_LOGIN_PATH: "/staff-test-sign-in" },
       setupFiles: "./src/test/setup.js",
       css: false,
       include: ["src/**/*.test.{js,jsx}"],

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import App, { AppProviders } from "../../App.jsx";
-import { DEMO_RESET_TOKEN } from "../../constants.js";
+import { DEMO_RESET_TOKEN, PATHS } from "../../constants.js";
 import { authService } from "../../services/index.js";
 
 function renderApp(path) {
@@ -48,7 +48,7 @@ describe("password reset service (demo adapter)", () => {
 
 describe("forgot password screens", () => {
   it("links to the reset page from every sign-in screen", async () => {
-    for (const path of ["/login", "/doctor/login", "/admin/login"]) {
+    for (const path of [PATHS.login, PATHS.doctorLogin, PATHS.adminLogin]) {
       const { unmount } = render(
         <MemoryRouter initialEntries={[path]}>
           <AppProviders>

@@ -42,14 +42,18 @@ export default function DoctorEditorForm({ doctor, onSubmit, onCancel }) {
   return (
     <form className="admin-form surface" onSubmit={submit} noValidate>
       <div className="panel-heading">
-        <h3>{doctor ? `Edit ${doctor.name}` : "Add a doctor profile"}</h3>
+        <h3>{doctor ? `Edit ${doctor.name}` : "Invite a doctor"}</h3>
         <button type="button" onClick={onCancel} aria-label="Close form">
           <X size={17} />
         </button>
       </div>
       <div className="form-grid">
         {!doctor && (
-          <Field label="Login email" error={errors.email}>
+          <Field
+            label="Doctor’s email"
+            error={errors.email}
+            hint="We email a link to set a password (valid 48 hours). They then upload their BMDC certificate."
+          >
             <input name="email" type="email" required autoComplete="off" placeholder="doctor@example.com" />
           </Field>
         )}
@@ -66,7 +70,7 @@ export default function DoctorEditorForm({ doctor, onSubmit, onCancel }) {
           Cancel
         </Button>
         <Button type="submit" disabled={busy}>
-          {doctor ? "Update profile" : "Save profile"} <ArrowRight size={14} />
+          {doctor ? "Update profile" : "Send invitation"} <ArrowRight size={14} />
         </Button>
       </div>
     </form>

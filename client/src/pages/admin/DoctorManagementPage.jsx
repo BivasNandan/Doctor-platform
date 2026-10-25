@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import DoctorEditorForm from "../../components/admin/DoctorEditorForm.jsx";
 import {
   Avatar,
@@ -11,7 +12,15 @@ import {
   SectionHeading,
   StatusPill,
 } from "../../components/ui/index.js";
-import { ACCOUNT_STATUS, PUBLICATION_STATUS, VERIFICATION_STATUS } from "../../constants.js";
+import {
+  ACCOUNT_STATUS,
+  isDemoMode,
+  ONBOARDING_STATUS,
+  ONBOARDING_STATUS_LABELS,
+  PATHS,
+  PUBLICATION_STATUS,
+  VERIFICATION_STATUS,
+} from "../../constants.js";
 import { useConfirm } from "../../context/ConfirmContext.jsx";
 import { useToast } from "../../context/ToastContext.jsx";
 import { useAction } from "../../hooks/useAction.js";
@@ -27,8 +36,11 @@ export default function DoctorManagementPage() {
   const [editor, setEditor] = useState(null); // null = closed, {} = new, doctor = editing
   const [query, setQuery] = useState("");
 
+  // Some endpoints return the plain doctor without the review details: keep what we already had.
   const replace = (updated) =>
-    doctors.setData((items) => items.map((item) => (item.id === updated.id ? updated : item)));
+    doctors.setData((items) =>
+      items.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+    );
 
   // Errors are thrown on purpose: the form shows them next to the fields.
   const save = async (profile) => {
@@ -39,7 +51,13 @@ export default function DoctorManagementPage() {
     if (isEdit) replace(saved);
     else doctors.setData((items) => [saved, ...(items ?? [])]);
     setEditor(null);
-    notify(isEdit ? `Updated ${saved.name}.` : "Doctor profile saved as pending verification.");
+    notify(
+      isEdit
+        ? `Updated ${saved.name}.`
+        : isDemoMode
+          ? "Invitation created. Demo mode sends no email: open it from Verification."
+          : `Invitation emailed to ${profile.email}. The link works for 48 hours.`,
+    );
   };
 
   const verify = (doctor, status) =>
@@ -91,7 +109,17 @@ export default function DoctorManagementPage() {
       header: "STATUS",
       render: (doctor) => (
         <>
-          <StatusPill status={doctor.verificationStatus} /> <StatusPill status={doctor.publicationStatus} />
+          {doctor.application && doctor.application.status !== ONBOARDING_STATUS.APPROVED ? (
+            <StatusPill
+              status={doctor.application.status}
+              label={ONBOARDING_STATUS_LABELS[doctor.application.status]}
+            />
+          ) : (
+            <>
+              <StatusPill status={doctor.verificationStatus} />{" "}
+              <StatusPill status={doctor.publicationStatus} />
+            </>
+          )}
         </>
       ),
     },
@@ -102,12 +130,20 @@ export default function DoctorManagementPage() {
         const verified = doctor.verificationStatus === VERIFICATION_STATUS.VERIFIED;
         const published = doctor.publicationStatus === PUBLICATION_STATUS.PUBLISHED;
         const active = !doctor.accountStatus || doctor.accountStatus === ACCOUNT_STATUS.ACTIVE;
+        // Doctors still joining are decided on the Verification screen (BMDC check first).
+        const joining =
+          (doctor.application?.status ?? ONBOARDING_STATUS.APPROVED) !== ONBOARDING_STATUS.APPROVED;
         return (
           <>
             <button className="table-action" type="button" onClick={() => setEditor(doctor)}>
               Edit
             </button>
-            {doctor.verificationStatus === VERIFICATION_STATUS.PENDING && (
+            {joining && (
+              <Link className="table-action" to={PATHS.adminVerification}>
+                Review application
+              </Link>
+            )}
+            {!joining && doctor.verificationStatus === VERIFICATION_STATUS.PENDING && (
               <button
                 className="table-action"
                 type="button"
@@ -161,7 +197,7 @@ export default function DoctorManagementPage() {
         description="Thoughtfully manage professional profiles and their visibility."
         action={
           <Button onClick={() => setEditor(editor ? null : {})}>
-            <Plus size={15} /> Add doctor
+            <Plus size={15} /> Invite doctor
           </Button>
         }
       />

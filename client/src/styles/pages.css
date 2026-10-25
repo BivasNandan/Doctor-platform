@@ -1258,9 +1258,18 @@
 .appointment-date strong {
   font: 700 20px var(--font-display);
 }
-.appointment-date span {
-  font-size: 12px;
+.appointment-date span,
+.appointment-date small {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
   text-transform: uppercase;
+}
+.appointment-date small {
+  margin-top: 1px;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
 }
 .appointment-doctor-image {
   width: 43px;
@@ -1310,6 +1319,45 @@
 .appointment-actions .text-link {
   color: var(--color-error);
   font-size: 12px;
+}
+/* "Request details": styled like the actions beside it, opening as a panel below the row. */
+.appointment-detail-more {
+  position: relative;
+}
+.appointment-actions .appointment-detail-more > summary {
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+.appointment-detail-more > summary::-webkit-details-marker {
+  display: none;
+}
+.appointment-actions .appointment-detail-more > summary:hover {
+  color: var(--color-text-primary);
+}
+.appointment-detail-more[open] > summary svg {
+  transform: rotate(180deg);
+}
+.appointment-detail-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 5;
+  width: min(320px, 80vw);
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 9px;
+  background: var(--color-surface-elevated);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+.appointment-detail-panel p {
+  margin: 0 0 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.appointment-detail-panel p:last-child {
+  margin-bottom: 0;
 }
 
 /* ═══ messaging ═══ */
@@ -2532,7 +2580,7 @@ td {
     box-shadow 0.16s ease;
 }
 .date-list button:hover:not(:disabled),
-.time-list button:hover:not(:disabled) {
+.time-list button:hover:not(:disabled):not(.time-disabled) {
   border-color: var(--color-interactive-primary);
 }
 .date-list button small {
@@ -2583,6 +2631,14 @@ td {
 .time-list button.time-disabled {
   color: var(--color-text-muted);
   background: var(--color-unavailable-bg);
+  cursor: not-allowed;
+}
+.time-list button.time-disabled:hover {
+  border-color: var(--color-border-default);
+  transform: none;
+}
+.time-list button.time-disabled:hover small {
+  color: var(--color-error-text);
 }
 .time-list button small {
   color: var(--color-text-muted);
@@ -2591,7 +2647,7 @@ td {
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .date-list button:hover:not(:disabled),
-  .time-list button:hover:not(:disabled),
+  .time-list button:hover:not(:disabled):not(.time-disabled),
   .admin-shortcuts .admin-shortcut:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-sm);
@@ -3692,5 +3748,152 @@ td {
 @media (prefers-reduced-motion: reduce) {
   .patient-dashboard-browse {
     transition: none;
+  }
+}
+
+/* ── Doctor application (join Carewell) ─────────────────────────────────────────────────── */
+.application-steps {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+.application-step {
+  padding: 15px;
+  border-radius: 12px;
+}
+.application-step > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.application-step h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.application-step-mark {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  place-items: center;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+}
+.application-step-done .application-step-mark {
+  color: var(--color-success-text);
+  border-color: var(--color-success-border);
+  background: var(--color-success-bg);
+}
+.application-step > :not(header) {
+  margin-left: 36px;
+}
+.application-summary {
+  margin: 10px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.application-note {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 12px;
+  color: var(--color-warning-text);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 9px;
+  background: var(--color-warning-bg);
+  font-size: 13px;
+}
+.application-note p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.application-note-error {
+  color: var(--color-error-text);
+  border-color: var(--color-error-border);
+  background: var(--color-error-bg);
+}
+.certificate-list {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.certificate-list li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.certificate-list li > span {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.certificate-list strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.certificate-list small {
+  color: var(--color-text-tertiary);
+}
+.certificate-upload {
+  margin-top: 6px;
+}
+.field-wide {
+  grid-column: 1 / -1;
+}
+.field-wide textarea {
+  width: 100%;
+  padding: 6px 8px;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: var(--color-surface-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+/* Administrator review card */
+.application-card {
+  align-items: start;
+}
+.application-card-body {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  min-width: 0;
+}
+.review-panel {
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+}
+.review-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.review-panel .privacy-note {
+  margin: 8px 0 0;
+}
+@media (max-width: 650px) {
+  .application-step > :not(header) {
+    margin-left: 0;
+  }
+  .application-card {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+  .application-card > .pill {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
 }

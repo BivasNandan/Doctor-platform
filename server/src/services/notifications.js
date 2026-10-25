@@ -13,6 +13,7 @@ export const LINKS = {
   messages: "/messages",
   profile: "/profile",
   doctorDashboard: "/doctor/dashboard",
+  doctorApplication: "/doctor/application",
   adminDoctors: "/admin/doctors",
   adminSupport: "/admin/support",
   adminDeactivations: "/admin/deactivation-requests",

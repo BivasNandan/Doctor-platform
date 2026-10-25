@@ -6,7 +6,7 @@ import { doctorInclude, findDoctor, findDoctors } from "../models/doctor.js";
 import { ADMIN_TRANSITIONS, changeAppointmentStatus } from "../services/appointments.js";
 import { revokeAllSessions, unusablePasswordHash } from "../services/auth.js";
 import {
-  createSlot,
+  createSlots,
   createSlotSchema,
   listSlots,
   removeSlot,
@@ -19,6 +19,8 @@ import {
   profileSchema,
   saveDoctorProfile,
 } from "../services/doctorProfile.js";
+import { appLink, issueInvitation, withReviewDetails } from "../services/applications.js";
+import { sendProfilePublishedEmail } from "../services/mail.js";
 import { LINKS, notifyDoctor } from "../services/notifications.js";
 import { ApiError, conflict, notFound, parse, uuid } from "../utils/errors.js";
 import { dhakaNow, toDbDate } from "../utils/time.js";
@@ -75,7 +77,7 @@ export const getSummary = async (request, response) => {
 
   const [pendingDoctors, verifiedDoctors, appointmentsToday, activeFacilities, activeSpecialties, monthly] =
     await Promise.all([
-      prisma.doctor.count({ where: { verificationStatus: "pending" } }),
+      prisma.doctor.count({ where: { onboardingStatus: "submitted" } }), // applications waiting for review
       prisma.doctor.count({ where: { verificationStatus: "verified" } }),
       prisma.appointment.count({
         where: { slot: { date: toDbDate(now.date) }, status: { in: ["pending", "accepted", "completed"] } },
@@ -115,8 +117,9 @@ export const listDoctors = async (request, response) => {
 };
 
 /**
- * POST /admin/doctors: creates the account and a profile that starts `pending` and
- * `unpublished`. The password is unusable: the doctor sets one with "forgot password".
+ * POST /admin/doctors: invites a doctor. Creates the account and a profile that starts `pending`,
+ * `unpublished` and `invited`, and emails a single-use link (48 hours) to choose a password. The
+ * doctor then completes the same application as everyone else, BMDC certificate included.
  */
 export const createDoctor = async (request, response) => {
   const data = parse(createDoctorSchema, request.body);
@@ -136,6 +139,7 @@ export const createDoctor = async (request, response) => {
           experienceYears: data.experienceYears,
           fee: data.fee,
           location: data.location,
+          onboardingStatus: "invited",
           clinics: { create: [...new Set(data.facilityIds)].map((clinicId) => ({ clinicId })) },
         },
       },
@@ -143,9 +147,10 @@ export const createDoctor = async (request, response) => {
     include: { doctor: true },
   });
   await prisma.conversation.create({ data: { kind: "doctor_admin", doctorId: user.doctor.id } });
+  await issueInvitation({ doctorId: user.doctor.id, user, invitedById: request.user.id });
   const doctor = await findDoctor(user.doctor.id);
   await audit(request, "doctor.create", "doctor", doctor.id, undefined, doctor);
-  response.status(201).json(doctor);
+  response.status(201).json((await withReviewDetails([doctor]))[0]);
 };
 
 export const updateDoctor = async (request, response) => {
@@ -198,6 +203,12 @@ export const setVerification = async (request, response) => {
   );
   const doctor = await prisma.doctor.findUnique({ where: { id } });
   if (!doctor) throw notFound("This doctor profile");
+  // A new doctor is verified only through the application review, which needs the BMDC check.
+  if (status === "verified" && doctor.onboardingStatus !== "approved")
+    throw conflict(
+      "APPLICATION_NOT_APPROVED",
+      "Approve this doctor's application first (Verification: BMDC check, then Approve).",
+    );
 
   // A profile that is no longer verified must not stay public.
   const data = { verificationStatus: status };
@@ -243,6 +254,12 @@ export const setPublication = async (request, response) => {
     { publicationStatus: doctor.publicationStatus },
     { publicationStatus: status },
   );
+  if (status === "published" && doctor.publicationStatus !== "published")
+    void sendProfilePublishedEmail({
+      to: doctor.user.email,
+      name: doctor.user.name,
+      link: appLink(LINKS.doctorDashboard),
+    });
   if (status !== doctor.publicationStatus)
     await notifyDoctor(id, {
       kind: "doctor",
@@ -385,10 +402,16 @@ export const createAvailability = async (request, response) => {
     createSlotSchema.extend({ doctorId: z.string().uuid("Choose a doctor.") }),
     request.body,
   );
-  const slot = await createSlot(doctorId, data);
-  await audit(request, "slot.create", "slot", slot.id, undefined, slot);
-  await notifyDoctor(doctorId, scheduleNotice(doctorId, `Added ${slot.date} at ${slot.startTime}.`));
-  response.status(201).json(slot);
+  const slots = await createSlots(doctorId, data);
+  for (const slot of slots) await audit(request, "slot.create", "slot", slot.id, undefined, slot);
+  await notifyDoctor(
+    doctorId,
+    scheduleNotice(
+      doctorId,
+      `Added ${slots.length} times on ${data.date}, ${data.startTime}–${data.endTime}.`,
+    ),
+  );
+  response.status(201).json(slots);
 };
 
 export const updateAvailability = async (request, response) => {

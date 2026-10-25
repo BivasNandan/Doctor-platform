@@ -41,8 +41,8 @@ export default function DoctorRegisterPage() {
     setFormError("");
     try {
       await registerDoctor({ ...account, ...profile });
-      notify("Registration submitted for verification.");
-      navigate(PATHS.doctorDashboard, { replace: true });
+      notify("Account created. Check your email for a 6-digit code.");
+      navigate(PATHS.doctorApplication, { replace: true });
     } catch (error) {
       setFormError(error.message || "Registration could not be completed.");
     } finally {
@@ -53,12 +53,12 @@ export default function DoctorRegisterPage() {
   return (
     <>
       <SectionHeading
-        eyebrow="CAREWELL PORTAL"
-        title="Doctor registration"
+        eyebrow="JOIN CAREWELL"
+        title="Apply as a doctor"
         description={
           isDemoMode
             ? "Demo mode: registration is simulated and creates no real account."
-            : "Your profile is reviewed by our team before it becomes visible to patients."
+            : "Create your account. Next you’ll confirm your email, upload your BMDC registration certificate and submit your application. Patients see your profile only after the administration checks your BMDC registration."
         }
       />
       <form className="admin-form surface" onSubmit={submit} noValidate>
@@ -85,7 +85,7 @@ export default function DoctorRegisterPage() {
             I already have an account
           </Link>
           <Button type="submit" disabled={busy}>
-            {busy ? "Submitting…" : "Submit for review"} <ArrowRight size={15} />
+            {busy ? "Creating account…" : "Create account and continue"} <ArrowRight size={15} />
           </Button>
         </div>
       </form>

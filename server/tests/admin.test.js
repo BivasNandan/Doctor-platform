@@ -228,6 +228,20 @@ describe("clinics and hospitals", () => {
   });
 });
 
+/**
+ * Stands in for the doctor's own steps (set a password, upload a BMDC certificate, submit) so these
+ * tests can exercise the administrator's side. The certificate row needs no stored file here.
+ */
+async function submitWithBmdcCertificate(doctorId) {
+  await ctx.prisma.doctorCertificate.create({
+    data: { doctorId, storageKey: "tests/not-stored.pdf", fileName: "bmdc.pdf", kind: "bmdc" },
+  });
+  await ctx.prisma.doctor.update({
+    where: { id: doctorId },
+    data: { onboardingStatus: "submitted", submittedAt: new Date() },
+  });
+}
+
 describe("doctors", () => {
   let clinicA;
   let clinicB;
@@ -288,14 +302,23 @@ describe("doctors", () => {
         publicationStatus: "unpublished",
         accountStatus: "active",
         profileReviewRequired: false,
+        onboardingStatus: "invited",
         location: "Dhanmondi, Dhaka",
         facilityIds: [clinicA.id],
         nextAvailable: "To be scheduled",
         availability: [],
         rating: 0,
         reviewCount: 0,
+        certificateFiles: [],
+        application: {
+          status: "invited",
+          emailVerified: false,
+          bmdcCheck: { result: "unchecked" },
+          invitationExpiresAt: doctor.application.invitationExpiresAt,
+        },
       },
     );
+    assert.ok(ctx.outbox.some((mail) => mail.to === "arif@test.local" && /invited/.test(mail.subject)));
   });
 
   it("creates the account too, with a password nobody can use", async () => {
@@ -339,9 +362,15 @@ describe("doctors", () => {
       409,
       "NOT_VERIFIED",
     );
+    fails(
+      await admin.patch(`/admin/doctors/${doctor.id}/verification`, { status: "verified" }),
+      409,
+      "APPLICATION_NOT_APPROVED",
+    );
+    await submitWithBmdcCertificate(doctor.id);
+    ok(await admin.patch(`/admin/doctors/${doctor.id}/bmdc-check`, { result: "matched" }));
     assert.equal(
-      ok(await admin.patch(`/admin/doctors/${doctor.id}/verification`, { status: "verified" }))
-        .verificationStatus,
+      ok(await admin.post(`/admin/doctors/${doctor.id}/application/approve`)).verificationStatus,
       "verified",
     );
     assert.equal(
@@ -405,7 +434,7 @@ describe("doctors", () => {
         facilityId: clinicA.id,
         date: day(5),
         startTime: "10:00",
-        endTime: "10:30",
+        endTime: "10:10",
       }),
       201,
     );
@@ -459,7 +488,13 @@ describe("doctors", () => {
     });
     const actions = entries.map((e) => e.action);
     assert.ok(
-      ["doctor.create", "doctor.verification", "doctor.publication"].every((a) => actions.includes(a)),
+      [
+        "doctor.create",
+        "doctor.bmdc_check",
+        "doctor.application.approved",
+        "doctor.verification",
+        "doctor.publication",
+      ].every((a) => actions.includes(a)),
     );
     assert.ok(entries.every((e) => e.actorId));
   });
@@ -475,7 +510,7 @@ describe("availability", () => {
     facilityId: clinic.id,
     date: day(3),
     startTime: "09:00",
-    endTime: "09:30",
+    endTime: "09:10",
     ...extra,
   });
 
@@ -515,10 +550,11 @@ describe("availability", () => {
       }),
       201,
     );
+    await ctx.prisma.doctor.update({ where: { id: doctor.id }, data: { onboardingStatus: "approved" } });
   });
 
   it("creates a slot in the shape the frontend uses", async () => {
-    slot = ok(await admin.post("/admin/availability", body()), 201);
+    [slot] = ok(await admin.post("/admin/availability", body()), 201);
     assert.deepEqual(
       { ...slot, id: undefined },
       {
@@ -527,7 +563,7 @@ describe("availability", () => {
         facilityId: clinic.id,
         date: day(3),
         startTime: "09:00",
-        endTime: "09:30",
+        endTime: "09:10",
         status: "available",
       },
     );
@@ -535,15 +571,15 @@ describe("availability", () => {
 
   it("refuses overlaps, but allows back-to-back and blocked slots", async () => {
     fails(
-      await admin.post("/admin/availability", body({ startTime: "09:15", endTime: "09:45" })),
+      await admin.post("/admin/availability", body({ startTime: "08:50", endTime: "09:20" })),
       409,
       "SLOT_OVERLAP",
     );
-    ok(await admin.post("/admin/availability", body({ startTime: "09:30", endTime: "10:00" })), 201);
+    ok(await admin.post("/admin/availability", body({ startTime: "09:10", endTime: "09:20" })), 201);
     ok(
       await admin.post(
         "/admin/availability",
-        body({ startTime: "09:10", endTime: "09:20", status: "unavailable" }),
+        body({ startTime: "09:20", endTime: "09:30", status: "unavailable" }),
       ),
       201,
     );
@@ -556,7 +592,7 @@ describe("availability", () => {
     fails(
       await admin.post(
         "/admin/availability",
-        body({ facilityId: other.id, startTime: "12:00", endTime: "12:30" }),
+        body({ facilityId: other.id, startTime: "12:00", endTime: "12:10" }),
       ),
       422,
     );
@@ -566,7 +602,7 @@ describe("availability", () => {
     const slots = ok(await admin.get(`/admin/availability?doctorId=${doctor.id}`));
     assert.deepEqual(
       slots.map((s) => s.startTime),
-      ["09:00", "09:10", "09:30"],
+      ["09:00", "09:10", "09:20"],
     );
     fails(await admin.get("/admin/availability"), 404);
   });
@@ -581,11 +617,11 @@ describe("availability", () => {
       "available",
     );
     const moved = ok(
-      await admin.patch(`/admin/availability/${slot.id}`, { startTime: "14:00", endTime: "14:30" }),
+      await admin.patch(`/admin/availability/${slot.id}`, { startTime: "14:00", endTime: "14:10" }),
     );
     assert.equal(moved.startTime, "14:00");
     fails(
-      await admin.patch(`/admin/availability/${slot.id}`, { startTime: "09:35", endTime: "09:50" }),
+      await admin.patch(`/admin/availability/${slot.id}`, { startTime: "09:15", endTime: "09:25" }),
       409,
       "SLOT_OVERLAP",
     );
@@ -596,7 +632,7 @@ describe("availability", () => {
     ok(await admin.patch(`/admin/doctors/${doctor.id}/verification`, { status: "verified" }));
     ok(await admin.patch(`/admin/doctors/${doctor.id}/publication`, { status: "published" }));
     ok(
-      await admin.post("/admin/availability", body({ date: day(1), startTime: "16:30", endTime: "17:00" })),
+      await admin.post("/admin/availability", body({ date: day(1), startTime: "16:30", endTime: "16:40" })),
       201,
     );
     const found = ok(await ctx.client().get(`/doctors/${doctor.id}`));
@@ -608,8 +644,8 @@ describe("availability", () => {
   });
 
   it("removes a slot, unless appointment requests refer to it", async () => {
-    const free = ok(
-      await admin.post("/admin/availability", body({ date: day(6), startTime: "15:00", endTime: "15:30" })),
+    const [free] = ok(
+      await admin.post("/admin/availability", body({ date: day(6), startTime: "15:00", endTime: "15:10" })),
       201,
     );
     assert.equal((await admin.delete(`/admin/availability/${free.id}`)).status, 204);
@@ -664,13 +700,13 @@ describe("appointments", () => {
       }),
       201,
     );
-    slot = ok(
+    [slot] = ok(
       await admin.post("/admin/availability", {
         doctorId: doctor.id,
         facilityId: clinic.id,
         date: day(2),
         startTime: "17:30",
-        endTime: "18:00",
+        endTime: "17:40",
       }),
       201,
     );
@@ -778,7 +814,7 @@ describe("summary", () => {
     const summary = ok(await admin.get("/admin/summary"));
     assert.equal(
       summary.pendingDoctors,
-      await ctx.prisma.doctor.count({ where: { verificationStatus: "pending" } }),
+      await ctx.prisma.doctor.count({ where: { onboardingStatus: "submitted" } }),
     );
     assert.equal(
       summary.verifiedDoctors,

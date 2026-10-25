@@ -4,7 +4,8 @@ import { useCatalog } from "../../context/CatalogContext.jsx";
 import { useConfirm } from "../../context/ConfirmContext.jsx";
 import { useResource } from "../../hooks/useResource.js";
 import { availabilityService } from "../../services/index.js";
-import { localDateKey } from "../../utils/dates.js";
+import { SLOT_MINUTES } from "../../constants.js";
+import { localDateKey, splitIntoSlots } from "../../utils/dates.js";
 import { readForm } from "../../utils/forms.js";
 import { Button, DataTable, ErrorState, Field, Notice, StatusPill } from "../ui/index.js";
 
@@ -12,7 +13,8 @@ const byStart = (a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.
 
 /**
  * Create, edit, block and remove a doctor's availability slots. Used by the
- * doctor workspace (own schedule) and by admins (`admin` + any doctor).
+ * doctor workspace (own schedule) and by admins (`admin` + any doctor). A new window
+ * (e.g. 09:00–10:00) becomes back-to-back SLOT_MINUTES slots that patients book one by one.
  * @param {{doctor: object, admin?: boolean, disabled?: boolean}} props
  */
 export default function AvailabilityManager({ doctor, admin = false, disabled = false }) {
@@ -27,8 +29,11 @@ export default function AvailabilityManager({ doctor, admin = false, disabled = 
   const clinicOptions = (doctor.facilityIds ?? []).map((id) => ({ id, name: facilityName(id) }));
   const scope = { admin };
 
-  const upsert = (saved) =>
-    slots.setData((items) => [...(items ?? []).filter((item) => item.id !== saved.id), saved]);
+  const upsert = (saved) => {
+    const list = [saved].flat();
+    const ids = new Set(list.map((item) => item.id));
+    slots.setData((items) => [...(items ?? []).filter((item) => !ids.has(item.id)), ...list]);
+  };
   const attempt = async (action) => {
     setError("");
     setNotice("");
@@ -45,6 +50,11 @@ export default function AvailabilityManager({ doctor, admin = false, disabled = 
     const data = readForm(form);
     if (data.startTime >= data.endTime) return setError("End time must be after start time.");
     if (data.date < localDateKey()) return setError("Past availability dates cannot be saved.");
+    const pieces = editing ? [] : splitIntoSlots(data.startTime, data.endTime, SLOT_MINUTES);
+    if (!editing && !pieces.length)
+      return setError(
+        `The time between start and end must divide into ${SLOT_MINUTES}-minute slots (for example 09:00–10:00).`,
+      );
     return attempt(async () => {
       const payload = {
         facilityId: data.facilityId,
@@ -58,7 +68,12 @@ export default function AvailabilityManager({ doctor, admin = false, disabled = 
         : await availabilityService.save(doctor.id, payload, scope);
       upsert(saved);
       setEditing(null);
-      setNotice(`Slot ${editing ? "updated" : "created"}${saved.simulated ? " (simulated)" : ""}.`);
+      const simulated = [saved].flat().some((item) => item.simulated) ? " (simulated)" : "";
+      setNotice(
+        editing
+          ? `Slot updated${simulated}.`
+          : `Created ${pieces.length} bookable times of ${SLOT_MINUTES} minutes, ${data.startTime}–${data.endTime}${simulated}.`,
+      );
       form.reset();
     });
   };
@@ -156,11 +171,11 @@ export default function AvailabilityManager({ doctor, admin = false, disabled = 
           <Field label="Start">
             <input type="time" name="startTime" defaultValue={editing?.startTime ?? ""} required />
           </Field>
-          <Field label="End">
+          <Field label="End" hint={editing ? undefined : `Split into ${SLOT_MINUTES}-minute times`}>
             <input type="time" name="endTime" defaultValue={editing?.endTime ?? ""} required />
           </Field>
           <Button type="submit">
-            <Check size={14} /> {editing ? "Save changes" : "Create slot"}
+            <Check size={14} /> {editing ? "Save changes" : "Create slots"}
           </Button>
           {editing && (
             <Button variant="outline" onClick={() => setEditing(null)}>

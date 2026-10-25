@@ -47,6 +47,7 @@ async function createDoctor({ published = true, clinics = [clinic], specialtyId 
           location: "Banani",
           verificationStatus: published ? "verified" : "pending",
           publicationStatus: published ? "published" : "unpublished",
+          onboardingStatus: "approved", // already joined; applications are covered in applications.test.js
           clinics: { create: clinics.map((item) => ({ clinicId: item.id })) },
         },
       },
@@ -76,18 +77,18 @@ async function createPatient({ verified = true } = {}) {
   return { id: user.id, email, client };
 }
 
-/** A slot created through the doctor's own API. */
+/** Availability created through the doctor's own API; resolves the first (earliest) slot. */
 const addSlot = async (doctor, extra = {}) =>
   ok(
     await doctor.client.post("/doctor/availability", {
       facilityId: clinic.id,
       date: day(2),
       startTime: "09:00",
-      endTime: "09:30",
+      endTime: "09:10",
       ...extra,
     }),
     201,
-  );
+  )[0];
 
 const bookingBody = (doctor, slot, extra = {}) => ({
   doctorId: doctor.id,
@@ -120,10 +121,10 @@ beforeEach(() => ctx.resetRateLimits());
 describe("open times for a doctor", () => {
   it("lists a day's available times in order, hiding blocked ones", async () => {
     const doctor = await createDoctor();
-    const first = await addSlot(doctor, { date: day(3), startTime: "09:00", endTime: "09:30" });
-    await addSlot(doctor, { date: day(3), startTime: "17:30", endTime: "18:00" });
-    await addSlot(doctor, { date: day(3), startTime: "12:00", endTime: "12:30", status: "unavailable" });
-    await addSlot(doctor, { date: day(4), startTime: "10:00", endTime: "10:30" });
+    const first = await addSlot(doctor, { date: day(3), startTime: "09:00", endTime: "09:10" });
+    await addSlot(doctor, { date: day(3), startTime: "17:30", endTime: "17:40" });
+    await addSlot(doctor, { date: day(3), startTime: "12:00", endTime: "12:10", status: "unavailable" });
+    await addSlot(doctor, { date: day(4), startTime: "10:00", endTime: "10:10" });
 
     const slots = ok(
       await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${clinic.id}&date=${day(3)}`),
@@ -141,7 +142,7 @@ describe("open times for a doctor", () => {
   it("marks times that are taken or already past", async () => {
     const doctor = await createDoctor();
     const patient = await createPatient();
-    const taken = await addSlot(doctor, { date: day(2), startTime: "11:00", endTime: "11:30" });
+    const taken = await addSlot(doctor, { date: day(2), startTime: "11:00", endTime: "11:10" });
     const request = ok(await patient.client.post("/appointment-requests", bookingBody(doctor, taken)), 201);
     ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }));
     await addSlot(doctor, { date: day(0), startTime: "00:00", endTime: "00:10" });
@@ -200,7 +201,7 @@ describe("requesting an appointment", () => {
   it("lets a patient book for a family member, choosing the time by its label", async () => {
     const doctor = await createDoctor();
     const patient = await createPatient();
-    const slot = await addSlot(doctor, { startTime: "17:30", endTime: "18:00" });
+    const slot = await addSlot(doctor, { startTime: "17:30", endTime: "17:40" });
     const { slotId, ...withoutId } = bookingBody(doctor, slot, {
       relationship: "child",
       patientName: "Ayaan Rahman",
@@ -260,7 +261,7 @@ describe("requesting an appointment", () => {
   it("refuses blocked, past and unknown times", async () => {
     const doctor = await createDoctor();
     const patient = await createPatient();
-    const blocked = await addSlot(doctor, { startTime: "13:00", endTime: "13:30", status: "unavailable" });
+    const blocked = await addSlot(doctor, { startTime: "13:00", endTime: "13:10", status: "unavailable" });
     fails(
       await patient.client.post("/appointment-requests", bookingBody(doctor, blocked)),
       422,
@@ -274,7 +275,7 @@ describe("requesting an appointment", () => {
       "VALIDATION_FAILED",
     );
 
-    const slot = await addSlot(doctor, { startTime: "14:00", endTime: "14:30" });
+    const slot = await addSlot(doctor, { startTime: "14:00", endTime: "14:10" });
     fails(
       await patient.client.post(
         "/appointment-requests",
@@ -370,9 +371,9 @@ describe("a patient's own requests", () => {
   it("lists only their requests, family bookings included", async () => {
     const doctor = await createDoctor();
     const [mine, theirs] = [await createPatient(), await createPatient()];
-    const a = await addSlot(doctor, { startTime: "09:00", endTime: "09:30" });
-    const b = await addSlot(doctor, { startTime: "10:00", endTime: "10:30" });
-    const c = await addSlot(doctor, { startTime: "11:00", endTime: "11:30" });
+    const a = await addSlot(doctor, { startTime: "09:00", endTime: "09:10" });
+    const b = await addSlot(doctor, { startTime: "10:00", endTime: "10:10" });
+    const c = await addSlot(doctor, { startTime: "11:00", endTime: "11:10" });
     ok(await mine.client.post("/appointment-requests", bookingBody(doctor, a)), 201);
     ok(
       await mine.client.post(
@@ -477,8 +478,8 @@ describe("the doctor's requests", () => {
     const doctor = await createDoctor();
     const patient = await createPatient();
     const [a, b] = [
-      await addSlot(doctor, { startTime: "09:00", endTime: "09:30" }),
-      await addSlot(doctor, { startTime: "10:00", endTime: "10:30" }),
+      await addSlot(doctor, { startTime: "09:00", endTime: "09:10" }),
+      await addSlot(doctor, { startTime: "10:00", endTime: "10:10" }),
     ];
     const toAccept = ok(await patient.client.post("/appointment-requests", bookingBody(doctor, a)), 201);
     const toReject = ok(await patient.client.post("/appointment-requests", bookingBody(doctor, b)), 201);
@@ -537,7 +538,7 @@ describe("the doctor's availability", () => {
         facilityId: clinic.id,
         date: day(2),
         startTime: "09:00",
-        endTime: "09:30",
+        endTime: "09:10",
         status: "available",
       },
     );
@@ -568,18 +569,20 @@ describe("the doctor's availability", () => {
         facilityId: clinic.id,
         date: day(2),
         startTime: "09:00",
-        endTime: "09:30",
+        endTime: "09:10",
         ...extra,
       });
-    fails(await post({ startTime: "09:15", endTime: "09:45" }), 409, "SLOT_OVERLAP");
+    fails(await post({ startTime: "08:50", endTime: "09:20" }), 409, "SLOT_OVERLAP");
+    // All or nothing: the free 08:50 and 09:10 slots of that refused window were not created.
+    assert.equal(ok(await doctor.client.get("/doctor/availability")).length, 1);
     fails(await post({ startTime: "11:00", endTime: "10:00" }), 422, "VALIDATION_FAILED");
-    fails(await post({ date: day(-1), startTime: "12:00", endTime: "12:30" }), 422, "VALIDATION_FAILED");
+    fails(await post({ date: day(-1), startTime: "12:00", endTime: "12:10" }), 422, "VALIDATION_FAILED");
     fails(
-      await post({ facilityId: otherClinic.id, startTime: "12:00", endTime: "12:30" }),
+      await post({ facilityId: otherClinic.id, startTime: "12:00", endTime: "12:10" }),
       422,
       "VALIDATION_FAILED",
     );
-    ok(await post({ startTime: "09:30", endTime: "10:00" }), 201); // back-to-back is fine
+    ok(await post({ startTime: "09:10", endTime: "09:20" }), 201); // back-to-back is fine
   });
 
   it("never lets a doctor read or change another doctor's schedule", async () => {
@@ -593,7 +596,7 @@ describe("the doctor's availability", () => {
     );
     fails(await other.client.delete(`/doctor/availability/${slot.id}`), 404, "NOT_FOUND");
     // A doctor id in the body is ignored: the slot still belongs to whoever is signed in.
-    const created = ok(
+    const [created] = ok(
       await other.client.post("/doctor/availability", {
         doctorId: owner.id,
         facilityId: clinic.id,
@@ -618,7 +621,7 @@ describe("the doctor's availability", () => {
   it("shows a new slot in the public next-available time", async () => {
     const doctor = await createDoctor();
     assert.equal(ok(await ctx.client().get(`/doctors/${doctor.id}`)).nextAvailable, "To be scheduled");
-    await addSlot(doctor, { date: day(1), startTime: "16:00", endTime: "16:30" });
+    await addSlot(doctor, { date: day(1), startTime: "16:00", endTime: "16:10" });
     assert.equal(ok(await ctx.client().get(`/doctors/${doctor.id}`)).nextAvailable, "Tomorrow, 4:00 PM");
   });
 });
@@ -705,5 +708,64 @@ describe("the doctor's own profile", () => {
       422,
       "VALIDATION_FAILED",
     );
+  });
+});
+
+describe("10-minute slots", () => {
+  const window = (doctor, startTime, endTime, extra = {}) =>
+    doctor.client.post("/doctor/availability", {
+      facilityId: clinic.id,
+      date: day(5),
+      startTime,
+      endTime,
+      ...extra,
+    });
+
+  it("cuts a window into back-to-back 10-minute slots from the start to the end time", async () => {
+    const doctor = await createDoctor();
+    const slots = ok(await window(doctor, "09:00", "10:00"), 201);
+    assert.deepEqual(
+      slots.map((slot) => `${slot.startTime}-${slot.endTime}`),
+      ["09:00-09:10", "09:10-09:20", "09:20-09:30", "09:30-09:40", "09:40-09:50", "09:50-10:00"],
+    );
+    assert.ok(slots.every((slot) => slot.status === "available" && slot.doctorId === doctor.id));
+  });
+
+  it("refuses a window that does not divide into 10-minute slots", async () => {
+    const doctor = await createDoctor();
+    const body = fails(await window(doctor, "09:00", "09:25"), 422, "VALIDATION_FAILED");
+    assert.ok(body.details.endTime);
+    assert.deepEqual(ok(await doctor.client.get("/doctor/availability")), []);
+  });
+
+  it("shows patients every 10-minute time, and an accepted one as booked", async () => {
+    const doctor = await createDoctor();
+    const patient = await createPatient();
+    const slots = ok(await window(doctor, "16:00", "16:30"), 201);
+    const request = ok(
+      await patient.client.post("/appointment-requests", bookingBody(doctor, slots[1])),
+      201,
+    );
+    ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }));
+
+    const open = ok(
+      await ctx.client().get(`/doctors/${doctor.id}/slots?facilityId=${clinic.id}&date=${day(5)}`),
+    );
+    assert.deepEqual(
+      open.map((slot) => [slot.label, slot.status]),
+      [
+        ["4:00 PM", "available"],
+        ["4:10 PM", "booked"],
+        ["4:20 PM", "available"],
+      ],
+    );
+    // A booked time cannot be requested again, by this patient or anyone else.
+    const other = await createPatient();
+    fails(
+      await other.client.post("/appointment-requests", bookingBody(doctor, slots[1])),
+      409,
+      "APPOINTMENT_CONFLICT",
+    );
+    ok(await other.client.post("/appointment-requests", bookingBody(doctor, slots[2])), 201);
   });
 });

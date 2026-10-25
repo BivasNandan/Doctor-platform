@@ -2,16 +2,21 @@ import {
   ACCOUNT_STATUS,
   ADMIN_APPOINTMENT_TRANSITIONS,
   APPOINTMENT_STATUS,
+  BMDC_CHECK,
+  CERTIFICATE_KINDS,
   DEMO_RESET_TOKEN,
   DEMO_VERIFICATION_CODE,
   DOCTOR_APPOINTMENT_TRANSITIONS,
   isAccountRestricted,
   isPubliclyListed,
   MESSAGE_MAX_LENGTH,
+  ONBOARDING_STATUS,
   PATIENT_CANCELLABLE_STATUSES,
   PUBLICATION_STATUS,
+  REAPPLY_DAYS,
   RELATIONSHIPS,
   ROLES,
+  SLOT_MINUTES,
   SLOT_STATUS,
   VERIFICATION_STATUS,
 } from "../constants.js";
@@ -26,7 +31,7 @@ import {
   specialties,
 } from "./demoData.js";
 import { ApiError } from "./httpClient.js";
-import { clockLabelToMinutes, localDateKey } from "../utils/dates.js";
+import { clockLabelToMinutes, clockToLabel, localDateKey, splitIntoSlots } from "../utils/dates.js";
 import { slugify } from "../utils/format.js";
 import { isValidEmail, isValidPhone } from "../utils/validation.js";
 
@@ -49,11 +54,36 @@ export const DEMO_PATIENT = Object.freeze({
   emailVerified: true,
 });
 
+/**
+ * Application details for the fixture doctors: verified ones joined long ago; the pending one has
+ * submitted an application with a BMDC certificate that nobody has checked yet.
+ */
+function fixtureApplication(doctor) {
+  const approved = doctor.verificationStatus === VERIFICATION_STATUS.VERIFIED;
+  return {
+    onboardingStatus: approved ? ONBOARDING_STATUS.APPROVED : ONBOARDING_STATUS.SUBMITTED,
+    emailVerified: true,
+    submittedAt: approved ? undefined : new Date().toISOString(),
+    bmdcCheck: { result: BMDC_CHECK.UNCHECKED },
+    certificates: approved
+      ? []
+      : [
+          {
+            id: `demo-cert-${doctor.id}`,
+            fileName: "BMDC-registration.pdf",
+            kind: "bmdc",
+            uploadedAt: new Date().toISOString(),
+          },
+        ],
+  };
+}
+
 function createDb() {
   return {
     doctors: clone(doctors).map((doctor) => ({
       ...doctor,
       accountStatus: "active",
+      ...fixtureApplication(doctor),
     })),
     facilities: clone(facilities).map((facility) => ({ ...facility, active: true })),
     specialties: clone(specialties).map((item) => ({ ...item, active: true })),
@@ -293,7 +323,10 @@ export const specialtyService = {
 };
 
 export const slotService = {
-  /** Demo schedule: a fixed clinic session minus accepted bookings and past times. */
+  /**
+   * The doctor's own availability for that day (10-minute slots), or a fixed demo session when
+   * they have none, minus blocked times; accepted bookings show as "booked".
+   */
   async listOpen({ doctorId, facilityId, date }) {
     const doctor = findDoctor(doctorId);
     if (!doctor || !doctor.facilityIds.includes(facilityId))
@@ -311,8 +344,19 @@ export const slotService = {
         )
         .map((item) => item.time),
     );
+    const own = db.availability
+      .filter(
+        (slot) =>
+          slot.doctorId === doctorId &&
+          slot.facilityId === facilityId &&
+          slot.date === date &&
+          slot.status !== SLOT_STATUS.UNAVAILABLE,
+      )
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .map((slot) => clockToLabel(slot.startTime));
+    const labels = own.length ? own : demoSlotTimes;
     return reply(
-      demoSlotTimes.map((label) => ({
+      labels.map((label) => ({
         label,
         status: booked.has(label)
           ? "booked"
@@ -352,6 +396,24 @@ export const supportService = {
 
 const DEMO_DOCTOR_ID = "d1";
 
+/** The signed-in user for a doctor profile, as GET /auth/me returns it. */
+const doctorUser = (doctor, email = doctor.email) => ({
+  id: doctor.id,
+  role: ROLES.DOCTOR,
+  doctorId: doctor.id,
+  name: doctor.name,
+  email,
+  accountStatus: doctor.accountStatus,
+  emailVerified: Boolean(doctor.emailVerified),
+  onboardingStatus: doctor.onboardingStatus,
+});
+
+/** Keeps the session in step after a doctor's own profile or application changes. */
+function refreshDoctorSession(doctor) {
+  if (db.session?.role === ROLES.DOCTOR && db.session.doctorId === doctor.id)
+    db.session = doctorUser(doctor, db.session.email);
+}
+
 /** Keeps the stored patient and the active session in step. */
 function savePatient(changes) {
   const session = requireRole(ROLES.PATIENT);
@@ -386,20 +448,17 @@ export const authService = {
         email,
       };
     } else {
-      const doctor = findDoctor(DEMO_DOCTOR_ID);
+      // A doctor who registered (or accepted an invitation) in this demo signs back in by email.
+      const registered = db.doctors.find(
+        (item) => item.email && item.email.toLowerCase() === email.toLowerCase() && item.hasPassword,
+      );
+      const doctor = registered ?? findDoctor(DEMO_DOCTOR_ID);
       if (isAccountRestricted(doctor))
         throw new ApiError(
           `This doctor account is ${doctor.accountStatus}. Contact Carewell administration.`,
           { status: 403, code: "ACCOUNT_RESTRICTED" },
         );
-      user = {
-        id: doctor.id,
-        role: ROLES.DOCTOR,
-        doctorId: doctor.id,
-        name: doctor.name,
-        email,
-        accountStatus: doctor.accountStatus,
-      };
+      user = doctorUser(doctor, email);
     }
     db.session = user;
     return reply({ user });
@@ -415,6 +474,8 @@ export const authService = {
     const { password, ...profile } = input;
     if (!profile.name || !profile.email) throw invalid("Name and email are required.");
     const specialty = db.specialties.find((item) => item.id === profile.specialtyId);
+    if (db.doctors.some((item) => item.email?.toLowerCase() === profile.email.trim().toLowerCase()))
+      throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
     const doctor = {
       ...profile,
       id: nextId("DEMO-DR"),
@@ -427,18 +488,37 @@ export const authService = {
       reviewCount: 0,
       availability: [],
       nextAvailable: "To be scheduled",
+      onboardingStatus: ONBOARDING_STATUS.IN_PROGRESS,
+      emailVerified: false,
+      hasPassword: true,
+      bmdcCheck: { result: BMDC_CHECK.UNCHECKED },
+      certificates: [],
     };
     db.doctors = [doctor, ...db.doctors];
-    const user = {
-      id: doctor.id,
-      role: ROLES.DOCTOR,
-      doctorId: doctor.id,
-      name: doctor.name,
-      email: doctor.email,
-      accountStatus: doctor.accountStatus,
-    };
+    const user = doctorUser(doctor);
     db.session = user;
     return reply({ user, doctor });
+  },
+
+  /** Demo invitations have no email: the token is shown to the administrator instead. */
+  async getInvitation(token) {
+    const doctor = invitedDoctor(token);
+    return reply({ name: doctor.name, email: doctor.email, expiresAt: doctor.invitationExpiresAt });
+  },
+
+  async acceptInvitation({ token, password }) {
+    const doctor = invitedDoctor(token);
+    if ((password ?? "").length < 8)
+      throw invalid("Use at least 8 characters.", { password: "Use at least 8 characters." });
+    Object.assign(doctor, {
+      onboardingStatus: ONBOARDING_STATUS.IN_PROGRESS,
+      emailVerified: true,
+      hasPassword: true,
+      invitationToken: undefined,
+      invitationExpiresAt: undefined,
+    });
+    db.session = doctorUser(doctor);
+    return reply({ user: db.session });
   },
 
   /** Creates an unverified patient account and signs them in. */
@@ -464,16 +544,22 @@ export const authService = {
     return reply({ user: db.session });
   },
 
-  /** Demo accepts the single code in `constants/demo.js`. */
+  /** Demo accepts the single code in `constants/demo.js` (patients at sign-up, doctors applying). */
   async verifyEmail(code) {
-    requireRole(ROLES.PATIENT);
+    const session = requireRole(ROLES.PATIENT, ROLES.DOCTOR);
     if (String(code).trim() !== DEMO_VERIFICATION_CODE)
       throw invalid("That code isn’t right. Check your email and try again.");
+    if (session.role === ROLES.DOCTOR) {
+      const doctor = ownDoctor();
+      doctor.emailVerified = true;
+      refreshDoctorSession(doctor);
+      return reply({ user: db.session });
+    }
     return reply({ user: savePatient({ emailVerified: true }) });
   },
 
   async resendVerification() {
-    requireRole(ROLES.PATIENT);
+    requireRole(ROLES.PATIENT, ROLES.DOCTOR);
     return reply({ sent: true });
   },
 
@@ -678,6 +764,93 @@ function requireActiveAccount(doctor) {
     });
 }
 
+/** Appointments and availability open only after the administration approves the application. */
+function requireApproved(doctor) {
+  if (doctor.onboardingStatus !== ONBOARDING_STATUS.APPROVED)
+    throw new ApiError("This becomes available once the administration approves your application.", {
+      status: 403,
+      code: "APPLICATION_NOT_APPROVED",
+    });
+}
+
+/** Profile and certificates are frozen while the administration reviews, and after a rejection. */
+function requireApplicationOpen(doctor) {
+  if (doctor.onboardingStatus === ONBOARDING_STATUS.SUBMITTED)
+    throw conflict(
+      "Your application is with the administration. You can make changes if they ask for them.",
+      "APPLICATION_LOCKED",
+    );
+  if (doctor.onboardingStatus === ONBOARDING_STATUS.REJECTED)
+    throw conflict(
+      "Your application was not approved. Start a new application when reapplying opens.",
+      "APPLICATION_LOCKED",
+    );
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const reapplyAt = (doctor) =>
+  doctor.onboardingStatus === ONBOARDING_STATUS.REJECTED && doctor.decidedAt
+    ? new Date(new Date(doctor.decidedAt).getTime() + REAPPLY_DAYS * DAY_MS).toISOString()
+    : undefined;
+
+/** GET /doctor/application, as the doctor sees it (no administrator notes). */
+function toApplication(doctor) {
+  const certificates = doctor.certificates ?? [];
+  const hasBmdcCertificate = certificates.some((item) => item.kind === "bmdc");
+  return {
+    status: doctor.onboardingStatus,
+    emailVerified: Boolean(doctor.emailVerified),
+    hasBmdcCertificate,
+    canSubmit:
+      [ONBOARDING_STATUS.IN_PROGRESS, ONBOARDING_STATUS.CHANGES_REQUESTED].includes(
+        doctor.onboardingStatus,
+      ) &&
+      Boolean(doctor.emailVerified) &&
+      hasBmdcCertificate,
+    submittedAt: doctor.submittedAt,
+    decidedAt: doctor.decidedAt,
+    note: doctor.decisionNote,
+    reapplyAt: reapplyAt(doctor),
+    certificates: certificates.map(({ id, fileName, kind, uploadedAt }) => ({
+      id,
+      fileName,
+      kind,
+      uploadedAt,
+    })),
+  };
+}
+
+const CERTIFICATE_KIND_VALUES = CERTIFICATE_KINDS.map((item) => item.value);
+const MAX_CERTIFICATES = 5;
+const CERTIFICATE_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+
+/** Adds a certificate (the demo keeps only its name). A new BMDC file resets the BMDC check. */
+function addCertificate(doctor, file, kind) {
+  if (!CERTIFICATE_KIND_VALUES.includes(kind))
+    throw invalid("Choose what kind of certificate this is.", {
+      kind: "Choose BMDC registration, degree or other.",
+    });
+  if (!file || (file.type && !CERTIFICATE_TYPES.includes(file.type)))
+    throw new ApiError("Upload a PDF, JPEG, PNG or WebP file.", { status: 422, code: "UNSUPPORTED_FILE" });
+  doctor.certificates = doctor.certificates ?? [];
+  if (doctor.certificates.length >= MAX_CERTIFICATES)
+    throw conflict(
+      `You can upload at most ${MAX_CERTIFICATES} certificate files. Remove one first.`,
+      "TOO_MANY_FILES",
+    );
+  const certificate = {
+    id: nextId("DEMO-CERT"),
+    fileName: file.name || "certificate",
+    kind,
+    uploadedAt: new Date().toISOString(),
+  };
+  doctor.certificates.push(certificate);
+  if (kind === "bmdc" && doctor.onboardingStatus !== ONBOARDING_STATUS.APPROVED)
+    doctor.bmdcCheck = { result: BMDC_CHECK.UNCHECKED };
+  return certificate;
+}
+
 export const doctorPortalService = {
   async getProfile() {
     return reply(ownDoctor());
@@ -686,9 +859,13 @@ export const doctorPortalService = {
   async updateProfile(input) {
     const doctor = ownDoctor();
     requireActiveAccount(doctor);
-    const reviewRequired = REVIEW_FIELDS.some(
-      (key) => input[key] !== undefined && JSON.stringify(doctor[key]) !== JSON.stringify(input[key]),
-    );
+    requireApplicationOpen(doctor);
+    // Before approval the whole profile is reviewed with the application anyway.
+    const reviewRequired =
+      doctor.onboardingStatus === ONBOARDING_STATUS.APPROVED &&
+      REVIEW_FIELDS.some(
+        (key) => input[key] !== undefined && JSON.stringify(doctor[key]) !== JSON.stringify(input[key]),
+      );
     const specialty = db.specialties.find((item) => item.id === input.specialtyId);
     Object.assign(doctor, input, {
       specialty: specialty?.name ?? doctor.specialty,
@@ -699,12 +876,84 @@ export const doctorPortalService = {
 
   async listAppointments() {
     const doctor = ownDoctor();
+    requireApproved(doctor);
     return reply(db.appointments.filter((item) => item.doctorId === doctor.id).map(hydrate));
   },
 
   async updateAppointmentStatus(id, status) {
-    requireActiveAccount(ownDoctor());
+    const doctor = ownDoctor();
+    requireApproved(doctor);
+    requireActiveAccount(doctor);
     return reply(hydrate(transitionAsDoctor(id, status)));
+  },
+
+  async getApplication() {
+    return reply(toApplication(ownDoctor()));
+  },
+
+  async submitApplication() {
+    const doctor = ownDoctor();
+    if (
+      ![ONBOARDING_STATUS.IN_PROGRESS, ONBOARDING_STATUS.CHANGES_REQUESTED].includes(doctor.onboardingStatus)
+    )
+      throw conflict("This application cannot be submitted right now.", "INVALID_TRANSITION");
+    if (!doctor.emailVerified)
+      throw conflict("Confirm your email address with the code we sent you first.", "EMAIL_NOT_VERIFIED");
+    if (!(doctor.certificates ?? []).some((item) => item.kind === "bmdc"))
+      throw new ApiError("Upload your BMDC registration certificate before submitting.", {
+        status: 422,
+        code: "BMDC_CERTIFICATE_REQUIRED",
+      });
+    Object.assign(doctor, {
+      onboardingStatus: ONBOARDING_STATUS.SUBMITTED,
+      submittedAt: new Date().toISOString(),
+      decisionNote: undefined,
+    });
+    refreshDoctorSession(doctor);
+    pushNotification("admin", {
+      kind: "doctor",
+      title: "New doctor application",
+      body: `${doctor.name} submitted an application. Check their BMDC certificate.`,
+      link: "/admin/verification",
+    });
+    return reply(toApplication(doctor));
+  },
+
+  async reopenApplication() {
+    const doctor = ownDoctor();
+    const opensAt = reapplyAt(doctor);
+    if (!opensAt) throw conflict("Only a rejected application can be started again.", "INVALID_TRANSITION");
+    if (new Date(opensAt) > new Date())
+      throw conflict(
+        `You can apply again from ${new Date(opensAt).toLocaleDateString("en-GB")}.`,
+        "REAPPLY_TOO_SOON",
+      );
+    Object.assign(doctor, {
+      onboardingStatus: ONBOARDING_STATUS.IN_PROGRESS,
+      verificationStatus: VERIFICATION_STATUS.PENDING,
+      decisionNote: undefined,
+      submittedAt: undefined,
+      bmdcCheck: { result: BMDC_CHECK.UNCHECKED },
+    });
+    refreshDoctorSession(doctor);
+    return reply(toApplication(doctor));
+  },
+
+  async uploadCertificate(file, kind) {
+    const doctor = ownDoctor();
+    requireApplicationOpen(doctor);
+    return reply(addCertificate(doctor, file, kind));
+  },
+
+  async deleteCertificate(id) {
+    const doctor = ownDoctor();
+    const certificate = (doctor.certificates ?? []).find((item) => item.id === id);
+    if (!certificate) throw notFound("This certificate");
+    requireApplicationOpen(doctor);
+    doctor.certificates = doctor.certificates.filter((item) => item.id !== id);
+    if (certificate.kind === "bmdc" && doctor.onboardingStatus !== ONBOARDING_STATUS.APPROVED)
+      doctor.bmdcCheck = { result: BMDC_CHECK.UNCHECKED };
+    return reply(null);
   },
 
   async requestDeactivation(reason) {
@@ -740,6 +989,7 @@ function resolveDoctorId(doctorId, { admin }) {
   const id = admin ? doctorId : session.doctorId;
   const doctor = findDoctor(id);
   if (!doctor) throw notFound("This doctor profile");
+  if (!admin) requireApproved(doctor);
   if (!admin && isAccountRestricted(doctor))
     throw new ApiError(`This account is ${doctor.accountStatus}.`, {
       status: 403,
@@ -780,17 +1030,24 @@ export const availabilityService = {
     return reply(db.availability.filter((slot) => slot.doctorId === id));
   },
 
+  /** Cuts the window into back-to-back SLOT_MINUTES slots, like the API. All or nothing. */
   async save(doctorId, slot, { admin = false } = {}) {
     const id = resolveDoctorId(doctorId, { admin });
-    const saved = {
+    validateSlot(id, { ...slot, doctorId: id });
+    const pieces = splitIntoSlots(slot.startTime, slot.endTime, SLOT_MINUTES);
+    if (!pieces.length)
+      throw invalid(`The time between start and end must divide into ${SLOT_MINUTES}-minute slots.`, {
+        endTime: `Choose an end time a multiple of ${SLOT_MINUTES} minutes after the start.`,
+      });
+    const saved = pieces.map((piece) => ({
       ...slot,
+      ...piece,
       id: nextId("DEMO-SLOT"),
       doctorId: id,
       status: slot.status || SLOT_STATUS.AVAILABLE,
       simulated: true,
-    };
-    validateSlot(id, saved);
-    db.availability = [...db.availability, saved];
+    }));
+    db.availability = [...db.availability, ...saved];
     return reply(saved);
   },
 
@@ -1140,6 +1397,62 @@ function requireDoctor(id) {
   return doctor;
 }
 
+const INVITATION_HOURS = 48;
+
+/** An invited doctor for a live invitation token, or a 410 like the API. */
+function invitedDoctor(token) {
+  const doctor = db.doctors.find((item) => item.invitationToken && item.invitationToken === token);
+  if (
+    !doctor ||
+    doctor.onboardingStatus !== ONBOARDING_STATUS.INVITED ||
+    new Date(doctor.invitationExpiresAt) < new Date()
+  )
+    throw new ApiError(
+      "This invitation link is invalid or has expired. Ask the Carewell administration to send a new one.",
+      { status: 410, code: "INVITATION_INVALID" },
+    );
+  return doctor;
+}
+
+/** A fresh invitation; the demo shows its token to the administrator instead of emailing it. */
+function issueInvitation(doctor) {
+  doctor.invitationToken = nextId("demo-invite").toLowerCase();
+  doctor.invitationExpiresAt = new Date(Date.now() + INVITATION_HOURS * 60 * 60 * 1000).toISOString();
+}
+
+/** What the administrator screens see: certificates and the application, as GET /admin/doctors returns them. */
+const toAdminDoctor = (doctor) => ({
+  ...doctor,
+  certificateFiles: (doctor.certificates ?? []).map((item) => ({ ...item, url: "" })),
+  application: {
+    status: doctor.onboardingStatus,
+    emailVerified: Boolean(doctor.emailVerified),
+    submittedAt: doctor.submittedAt,
+    decidedAt: doctor.decidedAt,
+    note: doctor.decisionNote,
+    reapplyAt: reapplyAt(doctor),
+    bmdcCheck: doctor.bmdcCheck ?? { result: BMDC_CHECK.UNCHECKED },
+    invitationExpiresAt:
+      doctor.onboardingStatus === ONBOARDING_STATUS.INVITED ? doctor.invitationExpiresAt : undefined,
+  },
+  // Demo only: there is no email, so the invitation link is handed to the administrator.
+  simulatedInvitationToken:
+    doctor.onboardingStatus === ONBOARDING_STATUS.INVITED ? doctor.invitationToken : undefined,
+});
+
+/** Records an application decision and tells the doctor (bell only: the demo sends no email). */
+function decideApplication(doctor, status, changes, notice) {
+  Object.assign(doctor, { onboardingStatus: status, decidedAt: new Date().toISOString() }, changes);
+  refreshDoctorSession(doctor);
+  pushNotification("doctor", { kind: "doctor", ...notice });
+  return reply(toAdminDoctor(doctor));
+}
+
+const requireNote = (note, message) => {
+  if (!note?.trim() || note.trim().length < 5) throw invalid(message, { note: message });
+  return note.trim();
+};
+
 function requireFacility(id) {
   const facility = db.facilities.find((item) => item.id === id);
   if (!facility) throw notFound("This facility");
@@ -1186,7 +1499,7 @@ export const adminService = {
     admin();
     const today = localDateKey();
     return reply({
-      pendingDoctors: db.doctors.filter((item) => item.verificationStatus === VERIFICATION_STATUS.PENDING)
+      pendingDoctors: db.doctors.filter((item) => item.onboardingStatus === ONBOARDING_STATUS.SUBMITTED)
         .length,
       verifiedDoctors: db.doctors.filter((item) => item.verificationStatus === VERIFICATION_STATUS.VERIFIED)
         .length,
@@ -1200,7 +1513,7 @@ export const adminService = {
   // Doctors ------------------------------------------------------------
   async listDoctors() {
     admin();
-    return reply(db.doctors);
+    return reply(db.doctors.map(toAdminDoctor));
   },
 
   async addDoctor(input) {
@@ -1210,6 +1523,8 @@ export const adminService = {
     if (!input.facilityIds?.length) throw invalid("Choose at least one clinic or hospital.");
     const specialty = db.specialties.find((item) => item.id === input.specialtyId);
     if (!specialty) throw invalid("Choose a specialty.");
+    if (input.email && db.doctors.some((item) => item.email?.toLowerCase() === input.email.toLowerCase()))
+      throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
     const doctor = {
       ...input,
       id: nextId("DEMO-DR"),
@@ -1222,9 +1537,109 @@ export const adminService = {
       reviewCount: 0,
       availability: [],
       nextAvailable: "To be scheduled",
+      onboardingStatus: ONBOARDING_STATUS.INVITED,
+      emailVerified: false,
+      bmdcCheck: { result: BMDC_CHECK.UNCHECKED },
+      certificates: [],
     };
+    issueInvitation(doctor);
     db.doctors = [doctor, ...db.doctors];
-    return reply(doctor);
+    return reply(toAdminDoctor(doctor));
+  },
+
+  async resendInvitation(id) {
+    admin();
+    const doctor = requireDoctor(id);
+    if (doctor.onboardingStatus !== ONBOARDING_STATUS.INVITED)
+      throw conflict("This doctor has already set up their account.", "INVALID_TRANSITION");
+    issueInvitation(doctor);
+    return reply(toAdminDoctor(doctor));
+  },
+
+  async uploadDoctorCertificate(id, file, kind) {
+    admin();
+    const doctor = requireDoctor(id);
+    addCertificate(doctor, file, kind);
+    return reply(toAdminDoctor(doctor));
+  },
+
+  async recordBmdcCheck(id, { result, note }) {
+    const session = admin();
+    const doctor = requireDoctor(id);
+    if (![BMDC_CHECK.MATCHED, BMDC_CHECK.NOT_FOUND, BMDC_CHECK.MISMATCH].includes(result))
+      throw invalid("Choose matched, not found or details don't match.");
+    if (!(doctor.certificates ?? []).some((item) => item.kind === "bmdc"))
+      throw new ApiError("There is no BMDC registration certificate to check yet.", {
+        status: 422,
+        code: "BMDC_CERTIFICATE_REQUIRED",
+      });
+    if (result !== BMDC_CHECK.MATCHED && !note?.trim())
+      throw invalid("Say what did not match.", { note: "Say what did not match." });
+    doctor.bmdcCheck = {
+      result,
+      note: note?.trim() || undefined,
+      checkedAt: new Date().toISOString(),
+      checkedBy: session.name,
+    };
+    return reply(toAdminDoctor(doctor));
+  },
+
+  async approveApplication(id) {
+    admin();
+    const doctor = requireDoctor(id);
+    if (doctor.onboardingStatus !== ONBOARDING_STATUS.SUBMITTED)
+      throw conflict("Only a submitted application can be approved.", "INVALID_TRANSITION");
+    if (doctor.bmdcCheck?.result !== BMDC_CHECK.MATCHED)
+      throw conflict(
+        "Record a matched BMDC check before approving: compare the certificate with the BMDC register.",
+        "BMDC_NOT_MATCHED",
+      );
+    return decideApplication(
+      doctor,
+      ONBOARDING_STATUS.APPROVED,
+      {
+        verificationStatus: VERIFICATION_STATUS.VERIFIED,
+        decisionNote: undefined,
+        profileReviewRequired: false,
+      },
+      {
+        title: "Your application was approved",
+        body: "Your workspace is open. Your profile becomes visible to patients once it is published.",
+        link: "/doctor/dashboard",
+      },
+    );
+  },
+
+  async requestApplicationChanges(id, note) {
+    admin();
+    const doctor = requireDoctor(id);
+    const message = requireNote(note, "Tell the doctor what to change.");
+    if (doctor.onboardingStatus !== ONBOARDING_STATUS.SUBMITTED)
+      throw conflict("Only a submitted application can be sent back.", "INVALID_TRANSITION");
+    return decideApplication(
+      doctor,
+      ONBOARDING_STATUS.CHANGES_REQUESTED,
+      { decisionNote: message },
+      { title: "Your application needs changes", body: message, link: "/doctor/application" },
+    );
+  },
+
+  async rejectApplication(id, note) {
+    admin();
+    const doctor = requireDoctor(id);
+    const message = requireNote(note, "Give the doctor a reason.");
+    if (![ONBOARDING_STATUS.SUBMITTED, ONBOARDING_STATUS.CHANGES_REQUESTED].includes(doctor.onboardingStatus))
+      throw conflict("Only an application under review can be rejected.", "INVALID_TRANSITION");
+    return decideApplication(
+      doctor,
+      ONBOARDING_STATUS.REJECTED,
+      {
+        decisionNote: message,
+        verificationStatus: VERIFICATION_STATUS.REJECTED,
+        publicationStatus: PUBLICATION_STATUS.UNPUBLISHED,
+      },
+      { title: "Your application was not approved", body: message, link: "/doctor/application" },
+    );
   },
 
   async updateDoctor(id, input) {
@@ -1248,6 +1663,11 @@ export const adminService = {
     if (!Object.values(VERIFICATION_STATUS).includes(status))
       throw invalid("Unsupported verification state.");
     const doctor = requireDoctor(id);
+    if (status === VERIFICATION_STATUS.VERIFIED && doctor.onboardingStatus !== ONBOARDING_STATUS.APPROVED)
+      throw conflict(
+        "Approve this doctor's application first (Verification: BMDC check, then Approve).",
+        "APPLICATION_NOT_APPROVED",
+      );
     doctor.verificationStatus = status;
     doctor.verified = status === VERIFICATION_STATUS.VERIFIED;
     // A profile that is no longer verified must not stay public.

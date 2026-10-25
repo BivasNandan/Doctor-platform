@@ -65,6 +65,7 @@ export function toDoctor(
     publicationStatus: doctor.publicationStatus,
     accountStatus: doctor.user.accountStatus,
     profileReviewRequired: doctor.profileReviewRequired,
+    onboardingStatus: doctor.onboardingStatus,
     location: doctor.location,
     facilityIds: doctor.clinics.map((c) => c.clinicId),
     nextAvailable: availability.nextAvailable,

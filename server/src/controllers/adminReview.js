@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { findDoctors } from "../models/doctor.js";
+import { withReviewDetails } from "../services/applications.js";
 import { revokeAllSessions } from "../services/auth.js";
 import { sendStoredFile } from "../services/files.js";
 import { sendMail } from "../services/mail.js";
@@ -27,25 +28,9 @@ const audit = (request, action, entityType, entityId, before, after) =>
   });
 
 // ── Doctors with their certificates ───────────────────────────────────────────────────────
-const certificateUrl = (doctorId, id) => `/api/v1/admin/doctors/${doctorId}/certificates/${id}`;
-const toCertificate = (row) => ({
-  id: row.id,
-  fileName: row.fileName,
-  uploadedAt: row.uploadedAt.toISOString(),
-  url: certificateUrl(row.doctorId, row.id),
-});
-
-/** GET /admin/doctors: every doctor, with `certificateFiles` for the verification screen. */
+/** GET /admin/doctors: every doctor, with `certificateFiles` and `application` for the review screens. */
 export const listDoctorsWithCertificates = async (request, response) => {
-  const doctors = await findDoctors();
-  const rows = await prisma.doctorCertificate.findMany({
-    where: { doctorId: { in: doctors.map((doctor) => doctor.id) } },
-    orderBy: { uploadedAt: "asc" },
-  });
-  const byDoctor = new Map();
-  for (const row of rows)
-    byDoctor.set(row.doctorId, [...(byDoctor.get(row.doctorId) ?? []), toCertificate(row)]);
-  response.json(doctors.map((doctor) => ({ ...doctor, certificateFiles: byDoctor.get(doctor.id) ?? [] })));
+  response.json(await withReviewDetails(await findDoctors()));
 };
 
 /** GET /admin/doctors/:id/certificates/:fileId: opens one uploaded certificate. */
