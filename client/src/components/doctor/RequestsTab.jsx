@@ -1,8 +1,16 @@
 import { useState } from "react";
 import { relationshipTag } from "../../constants.js";
+import { clockLabelToMinutes, localDateKey } from "../../utils/dates.js";
 import { useResource } from "../../hooks/useResource.js";
 import { doctorPortalService } from "../../services/index.js";
 import { DataTable, ErrorState, Notice, StatusPill } from "../ui/index.js";
+
+/** True once the visit's start time has come (the server checks the same thing). */
+function visitStarted(item, now = new Date()) {
+  const today = localDateKey(now);
+  if (item.date !== today) return item.date < today;
+  return clockLabelToMinutes(item.time) <= now.getHours() * 60 + now.getMinutes();
+}
 
 /** Appointment requests addressed to the signed-in doctor. */
 export default function RequestsTab({ restricted }) {
@@ -57,6 +65,16 @@ export default function RequestsTab({ restricted }) {
               Reject
             </button>
           </>
+        ) : item.status === "accepted" ? (
+          <button
+            className="table-action"
+            type="button"
+            disabled={restricted || !visitStarted(item)}
+            title={visitStarted(item) ? undefined : "Available once the appointment time has started"}
+            onClick={() => decide(item.id, "completed")}
+          >
+            Mark completed
+          </button>
         ) : (
           "—"
         ),

@@ -4,13 +4,13 @@ import { conflict } from "../utils/errors.js";
 import { LINKS, notify, notifyDoctor } from "./notifications.js";
 import { publish } from "./realtime.js";
 
-// Who may move an appointment request from which status to which. `completed` is only ever set by
-// an administrator; a doctor accepts or rejects, and a patient cancels.
+// Who may move an appointment request from which status to which. A doctor accepts or rejects, and
+// marks an accepted visit completed once its time has come; a patient cancels.
 export const ADMIN_TRANSITIONS = {
   pending: ["accepted", "rejected", "cancelled"],
   accepted: ["cancelled", "completed"],
 };
-export const DOCTOR_TRANSITIONS = { pending: ["accepted", "rejected"] };
+export const DOCTOR_TRANSITIONS = { pending: ["accepted", "rejected"], accepted: ["completed"] };
 export const PATIENT_TRANSITIONS = { pending: ["cancelled"], accepted: ["cancelled"] };
 
 const WHEN = (appointment) => `${appointment.date} at ${appointment.time}`;

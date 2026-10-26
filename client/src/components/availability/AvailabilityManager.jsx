@@ -25,7 +25,8 @@ export default function AvailabilityManager({ doctor, admin = false, disabled = 
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
 
-  const facilityName = (id) => facilities.find((item) => item.id === id)?.name ?? id;
+  // Never show a raw id: the clinic list may still be on its way.
+  const facilityName = (id) => facilities.find((item) => item.id === id)?.name ?? "Loading…";
   const clinicOptions = (doctor.facilityIds ?? []).map((id) => ({ id, name: facilityName(id) }));
   const scope = { admin };
 
@@ -171,7 +172,7 @@ export default function AvailabilityManager({ doctor, admin = false, disabled = 
           <Field label="Start">
             <input type="time" name="startTime" defaultValue={editing?.startTime ?? ""} required />
           </Field>
-          <Field label="End" hint={editing ? undefined : `Split into ${SLOT_MINUTES}-minute times`}>
+          <Field label="End">
             <input type="time" name="endTime" defaultValue={editing?.endTime ?? ""} required />
           </Field>
           <Button type="submit">

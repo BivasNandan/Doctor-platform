@@ -14,7 +14,8 @@ import {
 import { assertApplicationOpen } from "../services/applications.js";
 import { profileSchema, saveDoctorProfile } from "../services/doctorProfile.js";
 import { LINKS, notifyAdmins } from "../services/notifications.js";
-import { ApiError, notFound, parse, uuid } from "../utils/errors.js";
+import { ApiError, conflict, notFound, parse, uuid } from "../utils/errors.js";
+import { clock, dateKey, dhakaNow, minutesOf } from "../utils/time.js";
 
 /**
  * The doctor's own workspace. Which doctor is decided by the signed-in account, never by an id
@@ -84,16 +85,36 @@ export const listAppointments = async (request, response) => {
   response.json(appointments.map(toAppointment));
 };
 
-/** PATCH /doctor/appointments/:id { status: "accepted" | "rejected" }: only pending requests. */
+/**
+ * PATCH /doctor/appointments/:id { status }: accept or reject a pending request, or mark an
+ * accepted visit "completed" once its start time has passed (Asia/Dhaka).
+ */
 export const updateAppointmentStatus = async (request, response) => {
   assertCanChange(request);
   const id = uuid(request.params.id, "This request");
   const { status } = parse(
-    z.object({ status: z.enum(["accepted", "rejected"], { error: "Choose accepted or rejected." }) }),
+    z.object({
+      status: z.enum(["accepted", "rejected", "completed"], {
+        error: "Choose accepted, rejected or completed.",
+      }),
+    }),
     request.body,
   );
-  const appointment = await prisma.appointment.findFirst({ where: { id, doctorId: ownDoctorId(request) } });
+  const appointment = await prisma.appointment.findFirst({
+    where: { id, doctorId: ownDoctorId(request) },
+    include: { slot: true },
+  });
   if (!appointment) throw notFound("This request");
+  // Only an accepted visit can be completed (others get INVALID_TRANSITION below), and not in advance.
+  if (status === "completed" && appointment.status === "accepted") {
+    const now = dhakaNow();
+    const date = dateKey(appointment.slot.date);
+    const started =
+      date < now.date ||
+      (date === now.date && minutesOf(clock(appointment.slot.startTime)) <= now.minutes);
+    if (!started)
+      throw conflict("TOO_EARLY", "You can mark this visit completed once its appointment time has started.");
+  }
   response.json(await changeAppointmentStatus(appointment, status, DOCTOR_TRANSITIONS, "doctor"));
 };
 

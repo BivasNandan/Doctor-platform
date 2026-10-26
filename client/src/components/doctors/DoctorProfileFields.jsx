@@ -41,7 +41,15 @@ export default function DoctorProfileFields({
             disabled={disabled}
           />
         ) : (
-          <select name="specialtyId" required defaultValue={doctor?.specialtyId ?? ""} disabled={disabled}>
+          // Keyed by the option count: a default value is only applied when the select is first drawn,
+          // so it is redrawn once the specialties arrive (they can load after the form).
+          <select
+            key={specialties.length}
+            name="specialtyId"
+            required
+            defaultValue={doctor?.specialtyId ?? ""}
+            disabled={disabled}
+          >
             <option value="" disabled>
               Choose a specialty
             </option>
@@ -93,6 +101,7 @@ export default function DoctorProfileFields({
         />
       </Field>
       <CheckboxGroup
+        key={facilities.length} // redrawn once the clinics arrive, so the doctor's clinics are ticked
         legend="Clinics and hospitals"
         name="facilityIds"
         options={facilities.map((facility) => ({

@@ -39,6 +39,22 @@ function openBrowser(url) {
   });
 }
 
+/**
+ * Resolves once the API answers (or after a minute), so the page never opens before the API is up.
+ * Asking for the specialties also opens the first database connection, which is the slow part.
+ */
+async function waitForApi() {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    try {
+      if ((await fetch("http://localhost:3000/api/v1/specialties")).ok) return;
+    } catch {
+      // not listening yet
+    }
+    await new Promise((done) => setTimeout(done, 500));
+  }
+}
+
 function start(label, color, folder) {
   const child = spawn("npm", ["run", "dev"], {
     cwd: resolve(root, folder),
@@ -52,7 +68,7 @@ function start(label, color, folder) {
       console.log(prefix + line);
       // Vite prints "Local:   http://localhost:5173/Doctor-platform/" when it is ready.
       const address = label === "web" && line.replace(/\x1b\[[0-9;]*m/g, "").match(/Local:\s+(https?:\/\/\S+)/);
-      if (address) openBrowser(address[1]);
+      if (address) waitForApi().then(() => openBrowser(address[1]));
     });
   child.on("exit", (code) => {
     console.log(`${prefix}stopped (exit code ${code})`);

@@ -593,3 +593,28 @@ describe("doctor applications", () => {
     await expect(authService.getInvitation(token)).rejects.toMatchObject({ status: 410 });
   });
 });
+
+describe("completing a visit", () => {
+  it("lets the doctor complete an accepted visit once its time has come, not before", async () => {
+    await signInDoctor();
+    // a1 is an accepted fixture appointment on a past date.
+    expect((await doctorPortalService.updateAppointmentStatus("a1", "completed")).status).toBe("completed");
+    await expect(doctorPortalService.updateAppointmentStatus("a1", "completed")).rejects.toMatchObject({
+      code: "INVALID_TRANSITION",
+    });
+
+    db.appointments.push({
+      id: "future-visit",
+      doctorId: "d1",
+      facilityId: "f1",
+      date: daysFromNow(3),
+      time: "4:00 PM",
+      status: "accepted",
+    });
+    await expect(
+      doctorPortalService.updateAppointmentStatus("future-visit", "completed"),
+    ).rejects.toMatchObject({
+      code: "TOO_EARLY",
+    });
+  });
+});

@@ -646,6 +646,18 @@ describe("background refresh", () => {
 });
 
 describe("messaging", () => {
+  it("counts unread messages next to Messages, and clears the count once they are read", async () => {
+    const user = renderApp("/discover");
+    await user.click(await screen.findByRole("link", { name: "Sign in" }));
+    await signIn(user);
+    const nav = await screen.findByRole("navigation", { name: "Main navigation" });
+    const messagesLink = within(nav).getByRole("link", { name: /Messages/ });
+    expect(await within(messagesLink).findByLabelText("1 unread message")).toHaveTextContent("1");
+
+    await user.click(messagesLink);
+    await waitFor(() => expect(within(messagesLink).queryByLabelText(/unread/)).not.toBeInTheDocument());
+  });
+
   it("blocks threads without an accepted appointment and sends in eligible ones", async () => {
     const user = renderApp("/messages");
     await signIn(user);

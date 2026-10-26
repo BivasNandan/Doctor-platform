@@ -2,6 +2,7 @@ import { LayoutDashboard, Search } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { PATHS, ROLES } from "../../constants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import MessageBadge from "./MessageBadge.jsx";
 import { QUICK_NAV } from "./navigation.js";
 
 function QuickLink({ item }) {
@@ -11,7 +12,10 @@ function QuickLink({ item }) {
       aria-label={item.label}
       className={({ isActive }) => (isActive ? "quick-nav-active" : "")}
     >
-      <item.icon size={19} />
+      <span className="quick-nav-icon">
+        <item.icon size={19} />
+        {item.to === PATHS.messages && <MessageBadge className="nav-badge-corner" />}
+      </span>
       <span>{item.label}</span>
     </NavLink>
   );

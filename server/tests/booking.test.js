@@ -499,23 +499,26 @@ describe("the doctor's requests", () => {
     assert.equal(threads[0].kind, "patient_doctor");
   });
 
-  it("changes only pending requests, and only to accepted or rejected", async () => {
+  it("accepts or rejects pending requests, and completes an accepted visit once its time has come", async () => {
     const doctor = await createDoctor();
     const patient = await createPatient();
     const slot = await addSlot(doctor);
     const request = ok(await patient.client.post("/appointment-requests", bookingBody(doctor, slot)), 201);
+    const patch = (status) => doctor.client.patch(`/doctor/appointments/${request.id}`, { status });
 
-    fails(
-      await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "completed" }),
-      422,
-      "VALIDATION_FAILED",
-    );
-    ok(await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "accepted" }));
-    fails(
-      await doctor.client.patch(`/doctor/appointments/${request.id}`, { status: "rejected" }),
-      409,
-      "INVALID_TRANSITION",
-    );
+    fails(await patch("completed"), 409, "INVALID_TRANSITION"); // not accepted yet
+    fails(await patch("cancelled"), 422, "VALIDATION_FAILED");
+    ok(await patch("accepted"));
+    fails(await patch("rejected"), 409, "INVALID_TRANSITION");
+    fails(await patch("completed"), 409, "TOO_EARLY"); // the visit is in two days
+
+    // The visit time arrives.
+    await ctx.prisma.availabilitySlot.update({
+      where: { id: slot.id },
+      data: { date: new Date(`${day(-1)}T00:00:00Z`) },
+    });
+    assert.equal(ok(await patch("completed")).status, "completed");
+    fails(await patch("completed"), 409, "INVALID_TRANSITION");
   });
 
   it("keeps patients, administrators and guests out of the doctor workspace", async () => {
