@@ -32,9 +32,10 @@ export const APPOINTMENT_STATUS_LABELS = Object.freeze({
 /** Statuses a patient may cancel from. */
 export const PATIENT_CANCELLABLE_STATUSES = [APPOINTMENT_STATUS.PENDING, APPOINTMENT_STATUS.ACCEPTED];
 
-/** Transitions a doctor may perform on their own requests. */
+/** Transitions a doctor may perform on their own requests (completing only once the visit time has started). */
 export const DOCTOR_APPOINTMENT_TRANSITIONS = Object.freeze({
   pending: ["accepted", "rejected"],
+  accepted: ["completed"],
 });
 
 /** Transitions an administrator may perform. */

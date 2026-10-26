@@ -5,6 +5,7 @@ import { PATHS } from "../../constants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useModalBehavior } from "../../hooks/useModalBehavior.js";
 import Brand from "./Brand.jsx";
+import MessageBadge from "./MessageBadge.jsx";
 import { navigationFor } from "./navigation.js";
 
 /** Full-screen navigation for small screens. Rendered only while open. */
@@ -63,6 +64,7 @@ export default function MobileDrawer({ onClose }) {
               <span className="drawer-link-label">
                 <item.icon size={17} />
                 <span>{item.label}</span>
+                {item.to === PATHS.messages && <MessageBadge />}
               </span>
               <ArrowRight size={15} className="drawer-arrow" />
             </NavLink>

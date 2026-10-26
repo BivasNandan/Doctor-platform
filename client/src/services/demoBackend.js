@@ -701,7 +701,25 @@ export function transitionAsDoctor(id, status) {
   const appointment = db.appointments.find((item) => item.id === id && item.doctorId === session.doctorId);
   if (!appointment) throw notFound("This request");
   if (!DOCTOR_APPOINTMENT_TRANSITIONS[appointment.status]?.includes(status))
-    throw conflict("Only pending requests can be accepted or rejected.", "INVALID_TRANSITION");
+    throw conflict(`A ${appointment.status} request cannot be changed to ${status}.`, "INVALID_TRANSITION");
+  if (status === APPOINTMENT_STATUS.COMPLETED) {
+    const now = new Date();
+    const today = localDateKey(now);
+    const started =
+      appointment.date < today ||
+      (appointment.date === today &&
+        clockLabelToMinutes(appointment.time) <= now.getHours() * 60 + now.getMinutes());
+    if (!started)
+      throw conflict("You can mark this visit completed once its appointment time has started.", "TOO_EARLY");
+    appointment.status = status;
+    pushNotification("patient", {
+      kind: "appointment",
+      title: "Appointment completed",
+      body: "Your doctor marked the visit as completed. You can now rate the doctor.",
+      link: "/appointments",
+    });
+    return appointment;
+  }
   appointment.status = status;
   if (status === APPOINTMENT_STATUS.ACCEPTED) ensureConversation(appointment);
   pushNotification("patient", {
@@ -1140,6 +1158,9 @@ export const messagingService = {
     const viewer = requireViewer();
     const conversation = requireConversation(conversationId, viewer);
     if (!canMessage(conversation, viewer)) throw notEligible();
+    // Opening a conversation reads it, like the API: the unread badge goes away.
+    const stored = db.conversations.find((item) => item.id === conversationId);
+    if (stored) stored.unread = 0;
     return reply(
       (db.messages[conversationId] ?? []).map((message) => ({
         ...message,
@@ -1184,8 +1205,10 @@ export const messagingService = {
   },
 
   async unreadCount() {
-    requireViewer();
-    return reply({ count: 0 });
+    const viewer = requireViewer();
+    return reply({
+      count: visibleConversations(viewer).reduce((sum, item) => sum + (item.unread ?? 0), 0),
+    });
   },
 
   /** Administrators: the demo has a single doctor↔administration thread. */

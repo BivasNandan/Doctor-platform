@@ -403,18 +403,34 @@ a {
   overflow-y: auto;
   scrollbar-width: thin;
 }
+/* Unread-message counter next to "Messages" (sidebar, mobile drawer and, as a corner dot, the bottom bar). */
 .nav-badge {
   display: grid;
   place-items: center;
-  width: 19px;
+  min-width: 19px;
   height: 19px;
   margin-left: auto;
-  color: var(--color-warning-text);
-  background: var(--color-warning-bg);
-  border-radius: 50%;
-  font-size: 13px;
+  padding: 0 5px;
+  color: #fff;
+  background: var(--color-error);
+  border-radius: 999px;
+  font: 700 11px/1 var(--font-body);
   font-style: normal;
-  font-weight: 700;
+}
+.quick-nav-icon {
+  position: relative;
+  display: inline-grid;
+}
+.mobile-quick-nav .nav-badge-corner {
+  position: absolute;
+  top: -6px;
+  right: -11px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border: 2px solid var(--color-surface-primary);
+  font-size: 10px;
+  line-height: 1;
 }
 .sidebar-bottom {
   margin-top: auto;

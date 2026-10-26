@@ -5,6 +5,7 @@ import { SectionHeading } from "../components/ui/index.js";
 import { ROLES } from "../constants.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useRealtime, useRealtimeEvent } from "../context/RealtimeContext.jsx";
+import { useUnreadMessages } from "../context/UnreadMessagesContext.jsx";
 import { useResource } from "../hooks/useResource.js";
 import { messagingService } from "../services/index.js";
 
@@ -62,8 +63,12 @@ export default function MessagesPage() {
 
   // Opening a conversation marks it read on the server; refresh the list so its badge goes away.
   const reloadConversations = conversations.reload;
+  const { refresh: refreshUnread } = useUnreadMessages();
   useEffect(() => {
-    if (activeId && thread.data) reloadConversations();
+    if (activeId && thread.data) {
+      reloadConversations();
+      refreshUnread();
+    }
   }, [activeId, thread.data?.length, reloadConversations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const append = (message) => message && thread.setData((list) => withMessage(list, message));

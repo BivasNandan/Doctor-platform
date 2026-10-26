@@ -12,6 +12,7 @@ import { LanguageProvider } from "./context/LanguageContext.jsx";
 import { RealtimeProvider } from "./context/RealtimeContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { ToastProvider } from "./context/ToastContext.jsx";
+import { UnreadMessagesProvider } from "./context/UnreadMessagesContext.jsx";
 import DoctorInvitationPage from "./pages/auth/DoctorInvitationPage.jsx";
 import DoctorRegisterPage from "./pages/auth/DoctorRegisterPage.jsx";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage.jsx";
@@ -113,13 +114,15 @@ export function AppProviders({ children }) {
         <ConfirmProvider>
           <AuthProvider>
             <RealtimeProvider>
-              <CatalogProvider>
-                <LanguageProvider>
-                  <FavoritesProvider>
-                    <BookingProvider>{children}</BookingProvider>
-                  </FavoritesProvider>
-                </LanguageProvider>
-              </CatalogProvider>
+              <UnreadMessagesProvider>
+                <CatalogProvider>
+                  <LanguageProvider>
+                    <FavoritesProvider>
+                      <BookingProvider>{children}</BookingProvider>
+                    </FavoritesProvider>
+                  </LanguageProvider>
+                </CatalogProvider>
+              </UnreadMessagesProvider>
             </RealtimeProvider>
           </AuthProvider>
         </ConfirmProvider>

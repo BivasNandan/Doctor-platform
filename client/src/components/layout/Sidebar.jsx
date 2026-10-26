@@ -4,6 +4,7 @@ import { PATHS } from "../../constants.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { initials } from "../../utils/format.js";
 import Brand from "./Brand.jsx";
+import MessageBadge from "./MessageBadge.jsx";
 import { describeAccount, navigationFor } from "./navigation.js";
 
 /** Desktop sidebar navigation. Hidden on small screens (see MobileDrawer). */
@@ -37,6 +38,7 @@ export default function Sidebar() {
               >
                 <item.icon size={17} strokeWidth={1.8} />
                 <span>{item.label}</span>
+                {item.to === PATHS.messages && <MessageBadge />}
               </NavLink>
             ))}
           </div>
